@@ -1,7 +1,12 @@
 node_modules/
-npm-debug.log*
+dist/
 .env
 .env.*
+!.env.example
 coverage/
 *.log
-.DS_Store
+data/*.sqlite*
+data/*.db*
+data/openai-country-sync-state.json
+data/chrome-home/
+.wrangler/

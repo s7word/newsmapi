@@ -1,11 +1,15 @@
 {
-  "name": "newsmapi",
+  "name": "smsbazaar",
   "install": "npm ci",
   "terminals": [
     {
       "name": "api-server",
-      "command": "npm start"
+      "command": "npm run dev:server"
+    },
+    {
+      "name": "vite-client",
+      "command": "npm run dev:client"
     }
   ],
-  "ports": [3000]
+  "ports": [8787, 5173]
 }
