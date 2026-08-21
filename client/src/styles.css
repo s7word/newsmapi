@@ -714,7 +714,7 @@ select {
   position: fixed;
   top: 18px;
   right: 72px;
-  z-index: 20;
+  z-index: 50;
   border: 1px solid var(--icon-button-line);
   background: var(--icon-button-bg);
   color: #fff;

@@ -318,8 +318,9 @@ function SettingsModal({
             onSubmit={async (event) => {
               event.preventDefault();
               setLoginError('');
+              const formPassword = String(new FormData(event.currentTarget).get('password') || password || '');
               try {
-                await onLogin(password);
+                await onLogin(formPassword);
               } catch (error) {
                 setLoginError(error.message || '登录失败');
               }
@@ -329,6 +330,7 @@ function SettingsModal({
               管理员密码
               <input
                 type="password"
+                name="password"
                 value={password}
                 autoComplete="current-password"
                 onChange={(event) => setPassword(event.target.value)}
@@ -728,6 +730,12 @@ function App() {
               <small>FoundZiGu/SMSBazaar</small>
             </span>
           </a>
+          <button type="button" className="project-link settings-inline" onClick={() => setSettingsOpen(true)}>
+            <span>
+              <strong>平台设置</strong>
+              <small>{authenticated ? '已登录 · 管理 API Key' : '登录后配置 API Key'}</small>
+            </span>
+          </button>
         </div>
 
         <div className="service-switch" aria-label="选择对比服务">
