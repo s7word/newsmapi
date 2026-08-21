@@ -1,0 +1,30 @@
+{
+  "name": "newsmapi",
+  "version": "0.1.0",
+  "description": "A minimal News REST API",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "news",
+    "api",
+    "rest",
+    "express"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "eslint": "^9.18.0",
+    "supertest": "^7.0.0"
+  }
+}

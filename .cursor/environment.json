@@ -1,0 +1,11 @@
+{
+  "name": "newsmapi",
+  "install": "npm ci",
+  "terminals": [
+    {
+      "name": "api-server",
+      "command": "npm start"
+    }
+  ],
+  "ports": [3000]
+}
