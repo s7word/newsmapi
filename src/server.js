@@ -11,6 +11,7 @@ const { createOpenAiCountrySync } = require('./lib/openai-country-sync');
 const { bootstrapAdminPassword } = require('./lib/settings');
 
 const port = Number(process.env.PORT || 8787);
+const host = String(process.env.HOST || '0.0.0.0').trim() || '0.0.0.0';
 const refreshIntervalMs = Number(process.env.REFRESH_INTERVAL_MS || 120000);
 const refreshCooldownMs = Number(process.env.REFRESH_COOLDOWN_MS || 30000);
 const databasePath = process.env.DATABASE_PATH || './data/app.sqlite';
@@ -51,8 +52,8 @@ async function bootstrap() {
     countrySyncController,
   });
 
-  const server = app.listen(port, () => {
-    console.log(`Server listening on http://localhost:${port}`);
+  const server = app.listen(port, host, () => {
+    console.log(`Server listening on http://${host}:${port}`);
   });
 
   refreshController.refreshAll('startup', 'openai_chatgpt').catch((error) => {

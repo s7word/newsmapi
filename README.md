@@ -45,9 +45,11 @@ npm run dev
 
 本地开发时：
 
-- 前端地址：`http://localhost:5173`
-- 后端地址：`http://localhost:8787`
-- Vite 会把 `/api` 请求代理到后端。
+- 前端地址：`http://localhost:5173`（局域网：`http://<本机局域网 IP>:5173`）
+- 后端地址：`http://localhost:8787`（局域网：`http://<本机局域网 IP>:8787`）
+- 默认监听 `0.0.0.0`（环境变量 `HOST`），便于局域网同事访问；仅本机使用时可在 `.env` 设置 `HOST=127.0.0.1`
+- Vite 开发服务器同样默认 `0.0.0.0:5173`（`VITE_HOST` / `VITE_PORT`）
+- Vite 会把 `/api` 请求代理到后端
 
 ## 生产构建
 
@@ -65,6 +67,7 @@ npm start
 
 ```env
 PORT=8787
+HOST=0.0.0.0
 REFRESH_INTERVAL_MS=60000
 REFRESH_COOLDOWN_MS=30000
 DATABASE_PATH=./data/app.sqlite
