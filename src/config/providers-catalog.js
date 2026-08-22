@@ -103,6 +103,14 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.SMS_BUS_REFRESH_INTERVAL_MS || 180000),
   },
+  {
+    providerKey: 'vibe-sms',
+    displayName: 'Vibe SMS',
+    baseUrl: 'https://api.vibe-sms.net/api/v1',
+    keyEnv: 'VIBE_SMS_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.VIBE_SMS_REFRESH_INTERVAL_MS || 180000),
+  },
 ];
 
 function listProviders() {

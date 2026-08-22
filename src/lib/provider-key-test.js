@@ -169,6 +169,23 @@ async function testSmsBus(apiKey) {
   };
 }
 
+async function testVibeSms(apiKey) {
+  const payload = await getJson(buildUrl('https://api.vibe-sms.net/api/v1/balance', {
+    api_key: apiKey,
+  }), { timeoutMs: 15000 });
+
+  if (payload?.error) {
+    throw new Error(payload.error);
+  }
+
+  const balance = payload?.data?.balance ?? '';
+  return {
+    message: `连接成功 · 余额 ${balance} USD`,
+    details: { balance: String(balance), currency: 'USD' },
+    endpoint: 'GET /api/v1/balance',
+  };
+}
+
 async function testSmspva(apiKey) {
   const response = await request('https://api.smspva.com/activation/balance', {
     headers: { apikey: apiKey, Accept: 'application/json' },
@@ -315,6 +332,9 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'sms-bus':
       result = await testSmsBus(trimmedKey);
+      break;
+    case 'vibe-sms':
+      result = await testVibeSms(trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);
