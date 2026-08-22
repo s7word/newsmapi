@@ -14,6 +14,94 @@ const DEFAULT_RECOMMENDED_WHITELIST = [
   'ID', 'PH', 'CO', 'UA', 'NL', 'BR', 'PL', 'GB', 'CA', 'MX', 'IL', 'FR', 'SE', 'TH', 'HK',
 ];
 
+/** Provider service codes for OnlineSim, SMSPVA, CodesVerify, SMSCode.net, SMS-Rooms. */
+const EXTENDED_PROVIDER_CODES = {
+  openai_chatgpt: {
+    onlinesim: 'openai',
+    smspva: 'opt132',
+    codesverify: 'openai',
+    smscode: 'ChatGPT',
+    'sms-rooms': 'dr',
+  },
+  telegram: {
+    onlinesim: 'telegram',
+    smspva: 'opt29',
+    codesverify: 'telegram',
+    smscode: 'Telegram',
+    'sms-rooms': 'tg',
+  },
+  whatsapp: {
+    onlinesim: 'whatsapp',
+    smspva: 'opt20',
+    codesverify: 'whatsapp',
+    smscode: 'Whatsapp',
+    'sms-rooms': 'wa',
+  },
+  google: {
+    onlinesim: 'google',
+    smspva: 'opt1',
+    codesverify: 'google',
+    smscode: 'Google',
+    'sms-rooms': 'go',
+  },
+  discord: {
+    onlinesim: 'discord',
+    smspva: 'opt45',
+    codesverify: 'discord',
+    smscode: 'Discord',
+    'sms-rooms': 'ds',
+  },
+  microsoft: {
+    onlinesim: 'microsoft',
+    smspva: 'opt15',
+    codesverify: 'microsoft',
+    smscode: 'Microsoft',
+    'sms-rooms': 'mm',
+  },
+  twitter: {
+    onlinesim: 'twitter',
+    smspva: 'opt41',
+    codesverify: 'twitter',
+    smscode: 'Twitter',
+    'sms-rooms': 'tw',
+  },
+  instagram: {
+    onlinesim: 'instagram',
+    smspva: 'opt16',
+    codesverify: 'instagram',
+    smscode: 'Instagram',
+    'sms-rooms': 'ig',
+  },
+  facebook: {
+    onlinesim: '3223',
+    smspva: 'opt2',
+    codesverify: 'facebook',
+    smscode: 'Facebook',
+    'sms-rooms': 'fb',
+  },
+  tiktok: {
+    onlinesim: 'tiktok',
+    smspva: 'opt104',
+    codesverify: 'tiktok',
+    smscode: 'TikTok',
+    'sms-rooms': 'lf',
+  },
+  amazon: {
+    onlinesim: 'amazon',
+    smspva: 'opt44',
+    codesverify: 'amazon',
+    smscode: 'Amazon',
+    'sms-rooms': 'am',
+  },
+  apple: {
+    onlinesim: 'apple',
+    smspva: 'opt131',
+    codesverify: 'apple',
+    smscode: 'Apple',
+    'sms-rooms': 'wx',
+  },
+};
+
 /**
  * Multi-service catalog.
  * `codes` maps providerKey → upstream service/product code.
@@ -217,6 +305,17 @@ const SERVICES = [
     nativeNames: { smspool: 'Apple' },
   },
 ];
+
+for (const service of SERVICES) {
+  const extraCodes = EXTENDED_PROVIDER_CODES[service.serviceKey];
+  if (extraCodes) {
+    Object.assign(service.codes, extraCodes);
+    service.nativeNames = {
+      ...(service.nativeNames || {}),
+      smscode: extraCodes.smscode,
+    };
+  }
+}
 
 function listServices() {
   return SERVICES.map((service) => ({

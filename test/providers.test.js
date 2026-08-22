@@ -299,4 +299,64 @@ describe('provider adapters', () => {
       providerRef: '3',
     });
   });
+
+  it('parses smspva service prices', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => JSON.stringify({
+        statusCode: 200,
+        data: {
+          scode: 'opt132',
+          clist: [{
+            ccode: 'US',
+            cname: 'United States',
+            opers: [{ opcode: 'Total_US', price: 0.15, count: 12 }],
+          }],
+        },
+      }),
+    });
+
+    const { fetchProviderOffers } = await import('../src/lib/providers/smspva');
+    const result = await fetchProviderOffers({
+      mapping: { providerKey: 'smspva', displayName: 'SMSPVA', serviceCode: 'opt132' },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+
+    expect(result.error).toBe('');
+    expect(result.offers[0].countryIso2).toBe('US');
+    expect(result.offers[0].tiers[0].priceOriginal).toBe(0.15);
+    expect(result.offers[0].tiers[0].stock).toBe(12);
+  });
+
+  it('parses onlinesim per-country tariffs', async () => {
+    mockFetchSequence([
+      {
+        response: '1',
+        countries: {
+          _1: { name: 'USA', original: 'usa', code: 1, enable: true },
+        },
+      },
+      {
+        response: '1',
+        services: {
+          _openai: { id: 158, count: 42, price: '3.21', service: 'ChatGPT', slug: 'openai' },
+        },
+      },
+    ]);
+
+    const { fetchProviderOffers } = await import('../src/lib/providers/onlinesim');
+    const result = await fetchProviderOffers({
+      mapping: { providerKey: 'onlinesim', displayName: 'OnlineSim', serviceCode: 'openai' },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+
+    expect(result.error).toBe('');
+    expect(result.offers[0].countryIso2).toBe('US');
+    expect(result.offers[0].tiers[0].priceOriginal).toBe(3.21);
+    expect(result.offers[0].tiers[0].stock).toBe(42);
+  });
 });

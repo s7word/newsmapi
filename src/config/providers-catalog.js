@@ -57,6 +57,44 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.SMSPOOL_REFRESH_INTERVAL_MS || 180000),
   },
+  {
+    providerKey: 'onlinesim',
+    displayName: 'OnlineSim',
+    baseUrl: 'https://onlinesim.io/api',
+    keyEnv: 'ONLINESIM_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.ONLINESIM_REFRESH_INTERVAL_MS || 180000),
+  },
+  {
+    providerKey: 'smspva',
+    displayName: 'SMSPVA',
+    baseUrl: 'https://api.smspva.com',
+    keyEnv: 'SMSPVA_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.SMSPVA_REFRESH_INTERVAL_MS || 180000),
+  },
+  {
+    providerKey: 'codesverify',
+    displayName: 'CodesVerify',
+    baseUrl: 'https://api.codesverify.com',
+    keyEnv: 'CODESVERIFY_API_KEY',
+    publicWithoutKey: false,
+  },
+  {
+    providerKey: 'smscode',
+    displayName: 'SMSCode.net',
+    baseUrl: 'https://smscode.net/api/user',
+    keyEnv: 'SMSCODE_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.SMSCODE_REFRESH_INTERVAL_MS || 300000),
+  },
+  {
+    providerKey: 'sms-rooms',
+    displayName: 'SMS-Rooms',
+    baseUrl: 'https://sms-rooms.com/stubs/handler_api.php',
+    keyEnv: 'SMS_ROOMS_API_KEY',
+    publicWithoutKey: false,
+  },
 ];
 
 function listProviders() {

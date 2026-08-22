@@ -4,6 +4,7 @@ const { getProviderDefinition } = require('../config/providers-catalog');
 const { buildUrl, getJson } = require('./providers/helpers');
 const { getText, request } = require('./http');
 const smsbower = require('./providers/smsbower');
+const codesverifyProvider = require('./providers/codesverify');
 
 const ACTIVATE_FAIL = /^(BAD_KEY|ERROR_WRONG_KEY|BAD_ACTION|NO_KEY)/i;
 
@@ -136,6 +137,69 @@ async function testSmsVerification(baseUrl, apiKey) {
   return parseActivateBalance(text);
 }
 
+async function testOnlinesim(apiKey) {
+  const payload = await getJson(buildUrl('https://onlinesim.io/api/getBalance.php', {
+    apikey: apiKey,
+  }), { timeoutMs: 15000 });
+  if (String(payload?.response) !== '1') {
+    throw new Error(payload?.response || 'OnlineSim 余额查询失败');
+  }
+  const balance = payload?.balance ?? payload?.zbalance ?? '';
+  return {
+    message: `连接成功 · 余额 ${balance} USD`,
+    details: { balance: String(balance), currency: 'USD' },
+    endpoint: 'GET /api/getBalance.php',
+  };
+}
+
+async function testSmspva(apiKey) {
+  const response = await request('https://api.smspva.com/activation/balance', {
+    headers: { apikey: apiKey, Accept: 'application/json' },
+    timeoutMs: 15000,
+  });
+  const payload = JSON.parse(response.text);
+  if (Number(payload?.statusCode) !== 200) {
+    throw new Error(payload?.message || `SMSPVA 错误 (${payload?.statusCode || 'unknown'})`);
+  }
+  const balance = payload?.data?.balance ?? '';
+  return {
+    message: `连接成功 · 余额 ${balance}`,
+    details: { balance: String(balance), currency: 'USD' },
+    endpoint: 'GET /activation/balance',
+  };
+}
+
+async function testCodesverify(apiKey) {
+  const balance = await codesverifyProvider.getBalance(apiKey);
+  return {
+    message: `连接成功 · 余额 ${balance}`,
+    details: { balance: String(balance), currency: 'USD' },
+    endpoint: 'GET /get_balance.php',
+  };
+}
+
+async function testSmscode(apiKey) {
+  const text = await getText(buildUrl('https://smscode.net/api/user/get_balance.php', {
+    customer: apiKey,
+  }), { timeoutMs: 15000 });
+  const trimmed = String(text || '').trim();
+  if (/customer not found/i.test(trimmed)) {
+    throw new Error('Customer Not Found');
+  }
+  let balance = trimmed;
+  try {
+    const payload = JSON.parse(trimmed);
+    balance = payload?.balance != null ? String(payload.balance) : trimmed;
+  } catch {
+    // plain text
+  }
+  return {
+    message: `连接成功 · 余额 ${balance}`,
+    details: { balance: balance, currency: 'USD' },
+    endpoint: 'GET /api/user/get_balance.php',
+  };
+}
+
 async function testSmsPool(baseUrl, apiKey) {
   const normalizedBase = normalizeSmsPoolBaseUrl(baseUrl);
   const body = new URLSearchParams({ key: apiKey });
@@ -202,6 +266,7 @@ async function testProviderKey(providerKey, apiKey) {
   switch (providerKey) {
     case 'hero-sms':
     case 'grizzlysms':
+    case 'sms-rooms':
       result = await testActivateCompatible(definition.baseUrl, trimmedKey);
       break;
     case 'smsbower':
@@ -218,6 +283,18 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'smspool':
       result = await testSmsPool(definition.baseUrl, trimmedKey);
+      break;
+    case 'onlinesim':
+      result = await testOnlinesim(trimmedKey);
+      break;
+    case 'smspva':
+      result = await testSmspva(trimmedKey);
+      break;
+    case 'codesverify':
+      result = await testCodesverify(trimmedKey);
+      break;
+    case 'smscode':
+      result = await testSmscode(trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);
