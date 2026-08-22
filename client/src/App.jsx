@@ -486,6 +486,8 @@ function App() {
   const [keyProviders, setKeyProviders] = useState([]);
   const [settingsMessage, setSettingsMessage] = useState('');
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [refreshingService, setRefreshingService] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState('');
 
   useEffect(() => {
     const root = document.documentElement;
@@ -720,6 +722,70 @@ function App() {
     return payload.results || [];
   }
 
+  async function reloadDashboardData() {
+    const [metaResponse, compareResponse] = await Promise.all([
+      fetch(`/api/meta?service=${encodeURIComponent(filters.service)}`),
+      fetch(buildCompareUrl(filters, true)),
+    ]);
+    if (!metaResponse.ok || !compareResponse.ok) {
+      throw new Error('加载最新报价失败');
+    }
+    const [metaPayload, comparePayload] = await Promise.all([
+      metaResponse.json(),
+      compareResponse.json(),
+    ]);
+    setMeta(metaPayload);
+    setCompare(comparePayload);
+  }
+
+  async function handleRefreshCurrentService({ silent = false } = {}) {
+    if (!authenticated) {
+      setSettingsOpen(true);
+      setSettingsMessage('请先登录管理员账号，再点击「刷新当前服务」。');
+      return { ok: false };
+    }
+
+    setRefreshingService(true);
+    if (!silent) setRefreshNotice('正在向各平台拉取报价…');
+    setError('');
+    try {
+      const response = await fetch('/api/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(),
+        },
+        body: JSON.stringify({ service: filters.service }),
+      });
+      const payload = await response.json();
+      if (!response.ok && !payload.accepted) {
+        if (payload.reason === 'cooldown') {
+          throw new Error('刷新冷却中，请稍后再试');
+        }
+        if (payload.reason === 'already_running') {
+          throw new Error('已有刷新任务进行中');
+        }
+        throw new Error('刷新请求失败');
+      }
+
+      // Background refresh: wait briefly then reload dashboard snapshots.
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      await reloadDashboardData();
+      if (!silent) setRefreshNotice('当前服务报价已刷新');
+      return { ok: true };
+    } catch (refreshError) {
+      const message = refreshError.message || '刷新失败';
+      if (!silent) setRefreshNotice(message);
+      setError(message);
+      return { ok: false };
+    } finally {
+      setRefreshingService(false);
+      if (!silent) {
+        setTimeout(() => setRefreshNotice(''), 5000);
+      }
+    }
+  }
+
   async function handleSaveKeys(draftKeys) {
     setSettingsSaving(true);
     setSettingsMessage('');
@@ -735,15 +801,13 @@ function App() {
       if (!response.ok) throw new Error('保存失败');
       const payload = await response.json();
       setKeyProviders(payload.providers || []);
-      setSettingsMessage('已保存。可点击「刷新当前服务」拉取最新报价。');
-      await fetch('/api/refresh', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders(),
-        },
-        body: JSON.stringify({ service: filters.service }),
-      });
+      setSettingsMessage('已保存，正在刷新当前服务报价…');
+      const refreshResult = await handleRefreshCurrentService({ silent: true });
+      setSettingsMessage(
+        refreshResult.ok
+          ? '已保存，当前服务报价已刷新。'
+          : '已保存。若价格未更新，请关闭设置后点击主界面「刷新当前服务」。',
+      );
     } catch (saveError) {
       setSettingsMessage(saveError.message || '保存失败');
     } finally {
@@ -803,6 +867,16 @@ function App() {
           <h1>{meta?.service?.displayName || '短信'} 价格对比</h1>
         </div>
         <div className="hero-meta">
+          {authenticated ? (
+            <button
+              type="button"
+              className="hero-refresh-button"
+              disabled={refreshingService}
+              onClick={() => handleRefreshCurrentService()}
+            >
+              {refreshingService ? '刷新中…' : '刷新当前服务'}
+            </button>
+          ) : null}
           <div className="hero-badge">
             <span>国家</span>
             <strong>{summary.countryCount}</strong>
@@ -820,6 +894,7 @@ function App() {
             <strong>{formatRefreshInterval(meta?.display?.refreshIntervalMs)}</strong>
           </div>
         </div>
+        {refreshNotice ? <div className="refresh-notice">{refreshNotice}</div> : null}
       </div>
 
       <div className="panel card">
