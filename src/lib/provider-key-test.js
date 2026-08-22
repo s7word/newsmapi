@@ -308,6 +308,31 @@ async function testSimsms(apiKey) {
   };
 }
 
+async function testGetsms(apiKey) {
+  const { resolveCredentials } = require('./providers/getsms');
+  const credentials = resolveCredentials(apiKey);
+  const payload = await getJson(buildUrl('https://getsms.online/api_command.php', {
+    cmd: 'balance',
+    user: credentials.user,
+    api_key: credentials.apiKey,
+  }), { timeoutMs: 15000 });
+
+  if (String(payload?.status) === 'error') {
+    const message = String(payload?.message || 'GetSMS 错误');
+    if (/unauthorized/i.test(message)) {
+      throw new Error('Unauthorized (请检查 GETSMS_USER 或 user|api_key 格式)');
+    }
+    throw new Error(message);
+  }
+
+  const balance = payload?.message ?? '';
+  return {
+    message: `连接成功 · 余额 ${balance} USD`,
+    details: { balance: String(balance), currency: 'USD' },
+    endpoint: 'GET /api_command.php?cmd=balance',
+  };
+}
+
 async function testGiveSms(apiKey) {
   const payload = await getJson(buildUrl('https://give-sms.com/api/v1/', {
     method: 'getbalance',
@@ -497,6 +522,9 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'simsms':
       result = await testSimsms(trimmedKey);
+      break;
+    case 'getsms':
+      result = await testGetsms(trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);

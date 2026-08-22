@@ -31,6 +31,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'dr',
     pvapins: 'dr',
     simsms: 'opt132',
+    getsms: 'OpenAI',
   },
   telegram: {
     onlinesim: 'telegram',
@@ -47,6 +48,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'tg',
     pvapins: 'tg',
     simsms: 'opt29',
+    getsms: 'Telegram',
   },
   whatsapp: {
     onlinesim: 'whatsapp',
@@ -63,6 +65,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'wa',
     pvapins: 'wa',
     simsms: 'opt20',
+    getsms: 'WhatsApp',
   },
   google: {
     onlinesim: 'google',
@@ -79,6 +82,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'go',
     pvapins: 'go',
     simsms: 'opt1',
+    getsms: 'Google',
   },
   discord: {
     onlinesim: 'discord',
@@ -95,6 +99,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'ds',
     pvapins: 'ds',
     simsms: 'opt45',
+    getsms: 'Discord',
   },
   microsoft: {
     onlinesim: 'microsoft',
@@ -111,6 +116,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'mm',
     pvapins: 'mm',
     simsms: 'opt15',
+    getsms: 'Microsoft',
   },
   twitter: {
     onlinesim: 'twitter',
@@ -127,6 +133,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'tw',
     pvapins: 'tw',
     simsms: 'opt41',
+    getsms: 'Twitter',
   },
   instagram: {
     onlinesim: 'instagram',
@@ -143,6 +150,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'ig',
     pvapins: 'ig',
     simsms: 'opt16',
+    getsms: 'Instagram',
   },
   facebook: {
     onlinesim: '3223',
@@ -159,6 +167,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'fb',
     pvapins: 'fb',
     simsms: 'opt2',
+    getsms: 'Facebook',
   },
   tiktok: {
     onlinesim: 'tiktok',
@@ -175,6 +184,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'lf',
     pvapins: 'lf',
     simsms: 'opt104',
+    getsms: 'TikTok',
   },
   amazon: {
     onlinesim: 'amazon',
@@ -191,6 +201,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'am',
     pvapins: 'am',
     simsms: 'opt44',
+    getsms: 'Amazon',
   },
   apple: {
     onlinesim: 'apple',
@@ -207,6 +218,7 @@ const EXTENDED_PROVIDER_CODES = {
     'juicy-sms': 'wx',
     pvapins: 'wx',
     simsms: 'opt131',
+    getsms: 'Apple',
   },
 };
 
@@ -421,6 +433,7 @@ for (const service of SERVICES) {
     service.nativeNames = {
       ...(service.nativeNames || {}),
       smscode: extraCodes.smscode,
+      getsms: extraCodes.getsms,
     };
   }
 }

@@ -167,6 +167,14 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.SIMSMS_REFRESH_INTERVAL_MS || 300000),
   },
+  {
+    providerKey: 'getsms',
+    displayName: 'GetSMS',
+    baseUrl: 'https://getsms.online/api_command.php',
+    keyEnv: 'GETSMS_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.GETSMS_REFRESH_INTERVAL_MS || 300000),
+  },
 ];
 
 function listProviders() {
