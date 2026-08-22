@@ -151,6 +151,14 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.JUICYSMS_REFRESH_INTERVAL_MS || 180000),
   },
+  {
+    providerKey: 'pvapins',
+    displayName: 'PVAPins',
+    baseUrl: 'https://api.pvapins.com',
+    keyEnv: 'PVAPINS_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.PVAPINS_REFRESH_INTERVAL_MS || 300000),
+  },
 ];
 
 function listProviders() {

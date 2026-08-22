@@ -19,6 +19,7 @@ const vakSms = require('./vak-sms');
 const giveSms = require('./give-sms');
 const sms365 = require('./365sms');
 const juicySms = require('./juicy-sms');
+const pvapins = require('./pvapins');
 
 const providers = {
   'hero-sms': heroSms,
@@ -40,6 +41,7 @@ const providers = {
   'give-sms': giveSms,
   '365sms': sms365,
   'juicy-sms': juicySms,
+  pvapins,
 };
 
 function getProvider(providerKey) {

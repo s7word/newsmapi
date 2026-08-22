@@ -265,6 +265,27 @@ async function testJuicySms(apiKey) {
   }
 }
 
+async function testPvapins(apiKey) {
+  const payload = await getJson(buildUrl('https://api.pvapins.com/user/api/get_balance.php', {
+    customer: apiKey,
+  }), { timeoutMs: 15000 });
+
+  if (payload?.error) {
+    const error = String(payload.error);
+    if (/customer not found/i.test(error)) {
+      throw new Error('Customer Not Found');
+    }
+    throw new Error(error);
+  }
+
+  const balance = payload?.balance ?? '';
+  return {
+    message: `连接成功 · 余额 ${balance} USD`,
+    details: { balance: String(balance), currency: 'USD' },
+    endpoint: 'GET /user/api/get_balance.php',
+  };
+}
+
 async function testGiveSms(apiKey) {
   const payload = await getJson(buildUrl('https://give-sms.com/api/v1/', {
     method: 'getbalance',
@@ -448,6 +469,9 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'juicy-sms':
       result = await testJuicySms(trimmedKey);
+      break;
+    case 'pvapins':
+      result = await testPvapins(trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);
