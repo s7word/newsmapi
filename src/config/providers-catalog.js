@@ -119,6 +119,14 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.CYBERYOZH_REFRESH_INTERVAL_MS || 180000),
   },
+  {
+    providerKey: 'vak-sms',
+    displayName: 'Vak SMS',
+    baseUrl: 'https://vak-sms.com/stubs/handler_api.php',
+    keyEnv: 'VAK_SMS_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.VAK_SMS_REFRESH_INTERVAL_MS || 180000),
+  },
 ];
 
 function listProviders() {

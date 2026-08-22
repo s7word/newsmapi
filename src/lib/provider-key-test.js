@@ -218,6 +218,27 @@ async function testCyberYozh(apiKey) {
   };
 }
 
+async function testVakSms(apiKey) {
+  const payload = await getJson(buildUrl('https://vak-sms.com/api/getBalance/', {
+    apiKey,
+  }), { timeoutMs: 15000 });
+
+  if (payload?.error) {
+    const error = String(payload.error);
+    if (/apiKeyNotFound|badKey|BAD_KEY/i.test(error)) {
+      throw new Error('API Key 无效 (BAD_KEY)');
+    }
+    throw new Error(error);
+  }
+
+  const balance = payload?.balance ?? '';
+  return {
+    message: `连接成功 · 余额 ${balance} RUB`,
+    details: { balance: String(balance), currency: 'RUB' },
+    endpoint: 'GET /api/getBalance/',
+  };
+}
+
 async function testSmspva(apiKey) {
   const response = await request('https://api.smspva.com/activation/balance', {
     headers: { apikey: apiKey, Accept: 'application/json' },
@@ -370,6 +391,9 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'cyberyozh':
       result = await testCyberYozh(trimmedKey);
+      break;
+    case 'vak-sms':
+      result = await testVakSms(trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);
