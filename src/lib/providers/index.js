@@ -16,6 +16,7 @@ const smsBus = require('./sms-bus');
 const vibeSms = require('./vibe-sms');
 const cyberyozh = require('./cyberyozh');
 const vakSms = require('./vak-sms');
+const giveSms = require('./give-sms');
 
 const providers = {
   'hero-sms': heroSms,
@@ -34,6 +35,7 @@ const providers = {
   'vibe-sms': vibeSms,
   cyberyozh,
   'vak-sms': vakSms,
+  'give-sms': giveSms,
 };
 
 function getProvider(providerKey) {

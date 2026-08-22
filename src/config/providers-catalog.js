@@ -127,6 +127,14 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.VAK_SMS_REFRESH_INTERVAL_MS || 180000),
   },
+  {
+    providerKey: 'give-sms',
+    displayName: 'Give SMS',
+    baseUrl: 'https://give-sms.com/api/v1',
+    keyEnv: 'GIVE_SMS_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.GIVE_SMS_REFRESH_INTERVAL_MS || 180000),
+  },
 ];
 
 function listProviders() {

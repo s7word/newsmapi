@@ -239,6 +239,27 @@ async function testVakSms(apiKey) {
   };
 }
 
+async function testGiveSms(apiKey) {
+  const payload = await getJson(buildUrl('https://give-sms.com/api/v1/', {
+    method: 'getbalance',
+    userkey: apiKey,
+  }), { timeoutMs: 15000 });
+
+  if (Number(payload?.status) === 401) {
+    throw new Error('API Key 无效 (401)');
+  }
+  if (payload?.status && Number(payload.status) !== 200) {
+    throw new Error(payload?.data?.msg || `Give SMS 错误 (${payload.status})`);
+  }
+
+  const balance = payload?.data?.balance ?? '';
+  return {
+    message: `连接成功 · 余额 ${balance} RUB`,
+    details: { balance: String(balance), currency: 'RUB' },
+    endpoint: 'GET /api/v1/?method=getbalance',
+  };
+}
+
 async function testSmspva(apiKey) {
   const response = await request('https://api.smspva.com/activation/balance', {
     headers: { apikey: apiKey, Accept: 'application/json' },
@@ -394,6 +415,9 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'vak-sms':
       result = await testVakSms(trimmedKey);
+      break;
+    case 'give-sms':
+      result = await testGiveSms(trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);
