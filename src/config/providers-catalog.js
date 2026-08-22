@@ -95,6 +95,14 @@ const PROVIDERS = [
     keyEnv: 'SMS_ROOMS_API_KEY',
     publicWithoutKey: false,
   },
+  {
+    providerKey: 'sms-bus',
+    displayName: 'SMS-Bus',
+    baseUrl: 'https://sms-bus.com/api/control',
+    keyEnv: 'SMS_BUS_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.SMS_BUS_REFRESH_INTERVAL_MS || 180000),
+  },
 ];
 
 function listProviders() {

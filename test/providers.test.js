@@ -359,4 +359,57 @@ describe('provider adapters', () => {
     expect(result.offers[0].tiers[0].priceOriginal).toBe(3.21);
     expect(result.offers[0].tiers[0].stock).toBe(42);
   });
+
+  it('parses sms-bus country prices', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: async () => JSON.stringify({
+          code: 200,
+          data: { '52': { id: 52, code: 'openai', title: 'OpenAI/ChatGPT' } },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: async () => JSON.stringify({
+          code: 200,
+          data: { '1': { id: 1, title: 'United States', code: 'us' } },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: async () => JSON.stringify({
+          code: 200,
+          data: {
+            '52': {
+              country_id: 1,
+              project_id: 52,
+              project_code: 'openai',
+              cost: 1.25,
+              total_count: 120,
+              title: 'United States of America',
+              code: 'us',
+            },
+          },
+        }),
+      });
+
+    const { fetchProviderOffers } = await import('../src/lib/providers/sms-bus');
+    const result = await fetchProviderOffers({
+      mapping: { providerKey: 'sms-bus', displayName: 'SMS-Bus', serviceCode: 'openai' },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+
+    expect(result.error).toBe('');
+    expect(result.offers[0].countryIso2).toBe('US');
+    expect(result.offers[0].tiers[0].priceOriginal).toBe(1.25);
+    expect(result.offers[0].tiers[0].stock).toBe(120);
+  });
 });

@@ -152,6 +152,23 @@ async function testOnlinesim(apiKey) {
   };
 }
 
+async function testSmsBus(apiKey) {
+  const payload = await getJson(buildUrl('https://sms-bus.com/api/control/get/balance', {
+    token: apiKey,
+  }), { timeoutMs: 15000 });
+  if (Number(payload?.code) !== 200) {
+    throw new Error(payload?.message || 'SMS-Bus 余额查询失败');
+  }
+  const balance = payload?.data?.balance ?? '';
+  const frozen = payload?.data?.frozen;
+  const frozenText = frozen != null && frozen !== '' ? ` · 冻结 ${frozen}` : '';
+  return {
+    message: `连接成功 · 余额 ${balance}${frozenText}`,
+    details: { balance: String(balance), currency: 'USD' },
+    endpoint: 'GET /api/control/get/balance',
+  };
+}
+
 async function testSmspva(apiKey) {
   const response = await request('https://api.smspva.com/activation/balance', {
     headers: { apikey: apiKey, Accept: 'application/json' },
@@ -295,6 +312,9 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'smscode':
       result = await testSmscode(trimmedKey);
+      break;
+    case 'sms-bus':
+      result = await testSmsBus(trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);

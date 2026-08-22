@@ -12,6 +12,7 @@ const smspva = require('./smspva');
 const codesverify = require('./codesverify');
 const smscode = require('./smscode');
 const smsRooms = require('./sms-rooms');
+const smsBus = require('./sms-bus');
 
 const providers = {
   'hero-sms': heroSms,
@@ -26,6 +27,7 @@ const providers = {
   codesverify,
   smscode,
   'sms-rooms': smsRooms,
+  'sms-bus': smsBus,
 };
 
 function getProvider(providerKey) {

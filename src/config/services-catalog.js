@@ -22,6 +22,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'openai',
     smscode: 'ChatGPT',
     'sms-rooms': 'dr',
+    'sms-bus': 'openai',
   },
   telegram: {
     onlinesim: 'telegram',
@@ -29,6 +30,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'telegram',
     smscode: 'Telegram',
     'sms-rooms': 'tg',
+    'sms-bus': 'tg',
   },
   whatsapp: {
     onlinesim: 'whatsapp',
@@ -36,6 +38,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'whatsapp',
     smscode: 'Whatsapp',
     'sms-rooms': 'wa',
+    'sms-bus': 'wa',
   },
   google: {
     onlinesim: 'google',
@@ -43,6 +46,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'google',
     smscode: 'Google',
     'sms-rooms': 'go',
+    'sms-bus': 'google',
   },
   discord: {
     onlinesim: 'discord',
@@ -50,6 +54,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'discord',
     smscode: 'Discord',
     'sms-rooms': 'ds',
+    'sms-bus': 'discord',
   },
   microsoft: {
     onlinesim: 'microsoft',
@@ -57,6 +62,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'microsoft',
     smscode: 'Microsoft',
     'sms-rooms': 'mm',
+    'sms-bus': 'microsoft',
   },
   twitter: {
     onlinesim: 'twitter',
@@ -64,6 +70,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'twitter',
     smscode: 'Twitter',
     'sms-rooms': 'tw',
+    'sms-bus': 'tw',
   },
   instagram: {
     onlinesim: 'instagram',
@@ -71,6 +78,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'instagram',
     smscode: 'Instagram',
     'sms-rooms': 'ig',
+    'sms-bus': 'ig',
   },
   facebook: {
     onlinesim: '3223',
@@ -78,6 +86,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'facebook',
     smscode: 'Facebook',
     'sms-rooms': 'fb',
+    'sms-bus': 'fb',
   },
   tiktok: {
     onlinesim: 'tiktok',
@@ -85,6 +94,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'tiktok',
     smscode: 'TikTok',
     'sms-rooms': 'lf',
+    'sms-bus': 'tk',
   },
   amazon: {
     onlinesim: 'amazon',
@@ -92,6 +102,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'amazon',
     smscode: 'Amazon',
     'sms-rooms': 'am',
+    'sms-bus': 'amz',
   },
   apple: {
     onlinesim: 'apple',
@@ -99,6 +110,7 @@ const EXTENDED_PROVIDER_CODES = {
     codesverify: 'apple',
     smscode: 'Apple',
     'sms-rooms': 'wx',
+    'sms-bus': 'apple',
   },
 };
 
