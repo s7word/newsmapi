@@ -135,6 +135,14 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.GIVE_SMS_REFRESH_INTERVAL_MS || 180000),
   },
+  {
+    providerKey: '365sms',
+    displayName: '365SMS',
+    baseUrl: 'https://365sms.com/stubs/handler_api.php',
+    keyEnv: 'SMS365_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.SMS365_REFRESH_INTERVAL_MS || 180000),
+  },
 ];
 
 function listProviders() {

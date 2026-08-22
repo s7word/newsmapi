@@ -27,6 +27,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'dr',
     'vak-sms': 'dr',
     'give-sms': 'dr',
+    '365sms': 'dr',
   },
   telegram: {
     onlinesim: 'telegram',
@@ -39,6 +40,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'tg',
     'vak-sms': 'tg',
     'give-sms': 'tg',
+    '365sms': 'tg',
   },
   whatsapp: {
     onlinesim: 'whatsapp',
@@ -51,6 +53,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'wa',
     'vak-sms': 'wa',
     'give-sms': 'wa',
+    '365sms': 'wa',
   },
   google: {
     onlinesim: 'google',
@@ -63,6 +66,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'go',
     'vak-sms': 'go',
     'give-sms': 'go',
+    '365sms': 'go',
   },
   discord: {
     onlinesim: 'discord',
@@ -75,6 +79,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'ds',
     'vak-sms': 'ds',
     'give-sms': 'ds',
+    '365sms': 'ds',
   },
   microsoft: {
     onlinesim: 'microsoft',
@@ -87,6 +92,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'mm',
     'vak-sms': 'mm',
     'give-sms': 'mm',
+    '365sms': 'mm',
   },
   twitter: {
     onlinesim: 'twitter',
@@ -99,6 +105,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'tw',
     'vak-sms': 'tw',
     'give-sms': 'tw',
+    '365sms': 'tw',
   },
   instagram: {
     onlinesim: 'instagram',
@@ -111,6 +118,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'ig',
     'vak-sms': 'ig',
     'give-sms': 'ig',
+    '365sms': 'ig',
   },
   facebook: {
     onlinesim: '3223',
@@ -123,6 +131,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'fb',
     'vak-sms': 'fb',
     'give-sms': 'fb',
+    '365sms': 'fb',
   },
   tiktok: {
     onlinesim: 'tiktok',
@@ -135,6 +144,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'lf',
     'vak-sms': 'lf',
     'give-sms': 'lf',
+    '365sms': 'lf',
   },
   amazon: {
     onlinesim: 'amazon',
@@ -147,6 +157,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'am',
     'vak-sms': 'am',
     'give-sms': 'am',
+    '365sms': 'am',
   },
   apple: {
     onlinesim: 'apple',
@@ -159,6 +170,7 @@ const EXTENDED_PROVIDER_CODES = {
     cyberyozh: 'wx',
     'vak-sms': 'wx',
     'give-sms': 'wx',
+    '365sms': 'wx',
   },
 };
 

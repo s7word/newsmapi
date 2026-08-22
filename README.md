@@ -9,7 +9,7 @@ SMSBazaar 是一个用于对比多家短信接码平台、多种目标服务价�
 ## 功能特性
 
 - 多服务对比：OPENAI(ChatGPT)、Telegram、WhatsApp、Google、Discord、Microsoft、Twitter/X、Instagram、Facebook、TikTok、Amazon、Apple。
-- 已接入 17 家短信平台：Hero SMS、SMSBower、5sim、NexSMS、GrizzlySMS、SMS Verification Number、SMSPool、OnlineSim、SMSPVA、CodesVerify、SMSCode.net、SMS-Rooms、SMS-Bus、Vibe SMS、CyberYozh、Vak SMS、Give SMS。
+- 已接入 18 家短信平台：Hero SMS、SMSBower、5sim、NexSMS、GrizzlySMS、SMS Verification Number、SMSPool、OnlineSim、SMSPVA、CodesVerify、SMSCode.net、SMS-Rooms、SMS-Bus、Vibe SMS、CyberYozh、Vak SMS、Give SMS、365SMS。
 - 前端「设置」面板：管理员登录后可写入/更新平台 API Key（存 SQLite，优先于环境变量）。
 - 国家统一使用 ISO2 做主键，解决各平台国家 ID 不一致的问题。
 - 国家名称显示为中文名，后面带英文名。
@@ -139,6 +139,7 @@ SMSBower / 5SIM 支持无 Key 拉取公开报价，便于本地先跑通看板�
 | CyberYozh | https://app.cyberyozh.com/docs/ |
 | Vak SMS | https://vak-sms.com/api/vak/ |
 | Give SMS | https://give-sms.com/api.html |
+| 365SMS | https://365sms.com/ |
 
 平台服务码也可以通过环境变量覆盖：
 
