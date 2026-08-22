@@ -202,7 +202,6 @@ async function testProviderKey(providerKey, apiKey) {
   switch (providerKey) {
     case 'hero-sms':
     case 'grizzlysms':
-    case 'sms-activate':
       result = await testActivateCompatible(definition.baseUrl, trimmedKey);
       break;
     case 'smsbower':

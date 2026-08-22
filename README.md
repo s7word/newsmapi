@@ -9,7 +9,7 @@ SMSBazaar 是一个用于对比多家短信接码平台、多种目标服务价�
 ## 功能特性
 
 - 多服务对比：OPENAI(ChatGPT)、Telegram、WhatsApp、Google、Discord、Microsoft、Twitter/X、Instagram、Facebook、TikTok、Amazon、Apple。
-- 已接入 8 家短信平台：Hero SMS、SMSBower、5sim、NexSMS、GrizzlySMS、SMS Verification Number、SMSPool、SMS-Activate。
+- 已接入 7 家短信平台：Hero SMS、SMSBower、5sim、NexSMS、GrizzlySMS、SMS Verification Number、SMSPool。
 - 前端「设置」面板：管理员登录后可写入/更新平台 API Key（存 SQLite，优先于环境变量）。
 - 国家统一使用 ISO2 做主键，解决各平台国家 ID 不一致的问题。
 - 国家名称显示为中文名，后面带英文名。
@@ -99,7 +99,6 @@ NEXSMS_API_KEY=
 GRIZZLYSMS_API_KEY=
 SMS_VERIFICATION_API_KEY=
 SMSPOOL_API_KEY=
-SMS_ACTIVATE_API_KEY=
 ```
 
 也可以在启动后打开前端右上角「设置」，用 `ADMIN_PASSWORD`（或兼容的 `ADMIN_REFRESH_TOKEN`）登录，把 Key 写入 SQLite。数据库中的 Key 优先于环境变量。
@@ -117,7 +116,6 @@ SMSBower / 5SIM 支持无 Key 拉取公开报价，便于本地先跑通看板�
 | Grizzly SMS | https://grizzlysms.com |
 | SMS Verification Number | https://sms-verification-number.com |
 | SMSPool | https://www.smspool.net |
-| SMS-Activate | https://sms-activate.io |
 
 平台服务码也可以通过环境变量覆盖：
 

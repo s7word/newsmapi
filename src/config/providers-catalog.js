@@ -57,13 +57,6 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.SMSPOOL_REFRESH_INTERVAL_MS || 180000),
   },
-  {
-    providerKey: 'sms-activate',
-    displayName: 'SMS-Activate',
-    baseUrl: 'https://api.sms-activate.ae/stubs/handler_api.php',
-    keyEnv: 'SMS_ACTIVATE_API_KEY',
-    publicWithoutKey: false,
-  },
 ];
 
 function listProviders() {

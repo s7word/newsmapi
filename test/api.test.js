@@ -68,7 +68,8 @@ describe('API endpoints', () => {
     expect(Array.isArray(meta.body.service.whatsappSupportedWhitelistIso2)).toBe(true);
     expect(meta.body.countryListSync.status).toBe('bundled');
     expect(meta.body.recommendationConfig.filePath).toBeUndefined();
-    expect(meta.body.providers.some((provider) => provider.providerKey === 'sms-activate')).toBe(true);
+    expect(meta.body.providers.some((provider) => provider.providerKey === 'sms-verification-number')).toBe(true);
+    expect(meta.body.providers.some((provider) => provider.providerKey === 'sms-activate')).toBe(false);
 
     const compare = await request(app).get('/api/compare?mode=register&sort=price_asc');
     expect(compare.status).toBe(200);

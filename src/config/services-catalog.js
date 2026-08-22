@@ -17,7 +17,7 @@ const DEFAULT_RECOMMENDED_WHITELIST = [
 /**
  * Multi-service catalog.
  * `codes` maps providerKey → upstream service/product code.
- * Activate-compatible providers (Hero/Grizzly/SMSBower/SMS-Activate/...) share SMS-Activate style codes.
+ * Activate-compatible providers (Hero/Grizzly/SMSBower/...) share SMS-Activate style codes.
  */
 const SERVICES = [
   {
@@ -35,7 +35,6 @@ const SERVICES = [
       grizzlysms: process.env.GRIZZLYSMS_SERVICE_CODE || 'dr',
       'sms-verification-number': process.env.SMS_VERIFICATION_SERVICE_CODE || 'dr',
       smspool: process.env.SMSPOOL_SERVICE_CODE || '671',
-      'sms-activate': process.env.SMS_ACTIVATE_SERVICE_CODE || 'dr',
     },
     nativeNames: {
       smspool: process.env.SMSPOOL_NATIVE_SERVICE_NAME || 'OpenAI / ChatGPT',
@@ -54,7 +53,6 @@ const SERVICES = [
       grizzlysms: 'tg',
       'sms-verification-number': 'tg',
       smspool: '903',
-      'sms-activate': 'tg',
     },
     nativeNames: { smspool: 'Telegram' },
   },
@@ -71,7 +69,6 @@ const SERVICES = [
       grizzlysms: 'wa',
       'sms-verification-number': 'wa',
       smspool: '1012',
-      'sms-activate': 'wa',
     },
     nativeNames: { smspool: 'WhatsApp' },
   },
@@ -88,7 +85,6 @@ const SERVICES = [
       grizzlysms: 'go',
       'sms-verification-number': 'go',
       smspool: '142',
-      'sms-activate': 'go',
     },
     nativeNames: { smspool: 'Google' },
   },
@@ -105,7 +101,6 @@ const SERVICES = [
       grizzlysms: 'ds',
       'sms-verification-number': 'ds',
       smspool: '461',
-      'sms-activate': 'ds',
     },
     nativeNames: { smspool: 'Discord' },
   },
@@ -122,7 +117,6 @@ const SERVICES = [
       grizzlysms: 'mm',
       'sms-verification-number': 'mm',
       smspool: '465',
-      'sms-activate': 'mm',
     },
     nativeNames: { smspool: 'Microsoft' },
   },
@@ -139,7 +133,6 @@ const SERVICES = [
       grizzlysms: 'tw',
       'sms-verification-number': 'tw',
       smspool: '6',
-      'sms-activate': 'tw',
     },
     nativeNames: { smspool: 'Twitter' },
   },
@@ -156,7 +149,6 @@ const SERVICES = [
       grizzlysms: 'ig',
       'sms-verification-number': 'ig',
       smspool: '17',
-      'sms-activate': 'ig',
     },
     nativeNames: { smspool: 'Instagram' },
   },
@@ -173,7 +165,6 @@ const SERVICES = [
       grizzlysms: 'fb',
       'sms-verification-number': 'fb',
       smspool: '7',
-      'sms-activate': 'fb',
     },
     nativeNames: { smspool: 'Facebook' },
   },
@@ -190,7 +181,6 @@ const SERVICES = [
       grizzlysms: 'lf',
       'sms-verification-number': 'lf',
       smspool: '1070',
-      'sms-activate': 'lf',
     },
     nativeNames: { smspool: 'TikTok' },
   },
@@ -207,7 +197,6 @@ const SERVICES = [
       grizzlysms: 'am',
       'sms-verification-number': 'am',
       smspool: '44',
-      'sms-activate': 'am',
     },
     nativeNames: { smspool: 'Amazon' },
   },
@@ -224,7 +213,6 @@ const SERVICES = [
       grizzlysms: 'wx',
       'sms-verification-number': 'wx',
       smspool: '1438',
-      'sms-activate': 'wx',
     },
     nativeNames: { smspool: 'Apple' },
   },

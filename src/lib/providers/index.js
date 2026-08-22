@@ -7,7 +7,6 @@ const nexsms = require('./nexsms');
 const grizzlysms = require('./grizzlysms');
 const smsVerificationNumber = require('./sms-verification-number');
 const smspool = require('./smspool');
-const smsActivate = require('./sms-activate');
 
 const providers = {
   'hero-sms': heroSms,
@@ -17,7 +16,6 @@ const providers = {
   grizzlysms,
   'sms-verification-number': smsVerificationNumber,
   smspool,
-  'sms-activate': smsActivate,
 };
 
 function getProvider(providerKey) {
