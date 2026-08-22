@@ -16,6 +16,22 @@ function normalizeSmsPoolBaseUrl(baseUrl) {
 function parseActivateBalance(text) {
   const trimmed = String(text || '').trim();
   if (!trimmed) throw new Error('平台返回空响应');
+
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      const payload = JSON.parse(trimmed);
+      const title = String(payload?.title || payload?.error || '').trim();
+      if (/BAD_KEY|UNAUTHORIZED/i.test(title) || /BAD_KEY/i.test(JSON.stringify(payload))) {
+        throw new Error('API Key 无效 (BAD_KEY)');
+      }
+      if (title) throw new Error(title);
+    } catch (error) {
+      if (error.message === 'API Key 无效 (BAD_KEY)' || error.message !== 'Unexpected token') {
+        throw error;
+      }
+    }
+  }
+
   if (ACTIVATE_FAIL.test(trimmed) || /^BAD_/i.test(trimmed)) {
     throw new Error(trimmed === 'BAD_KEY' ? 'API Key 无效 (BAD_KEY)' : trimmed);
   }
@@ -36,11 +52,19 @@ function parseActivateBalance(text) {
 }
 
 async function testActivateCompatible(baseUrl, apiKey) {
-  const text = await getText(buildUrl(baseUrl, {
-    action: 'getBalance',
-    api_key: apiKey,
-  }), { timeoutMs: 15000 });
-  return parseActivateBalance(text);
+  try {
+    const text = await getText(buildUrl(baseUrl, {
+      action: 'getBalance',
+      api_key: apiKey,
+    }), { timeoutMs: 15000 });
+    return parseActivateBalance(text);
+  } catch (error) {
+    const body = String(error?.body || error?.message || '');
+    if (/BAD_KEY/i.test(body)) {
+      throw new Error('API Key 无效 (BAD_KEY)');
+    }
+    throw error;
+  }
 }
 
 async function test5sim(baseUrl, apiKey) {
