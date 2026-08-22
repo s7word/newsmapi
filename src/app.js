@@ -26,11 +26,13 @@ const {
   login,
   requireAdmin,
   resolveProviderApiKey,
+  saveProviderConnectivityFromTest,
   setAdminPassword,
   upsertProviderKey,
 } = require('./lib/settings');
 const { listProviders } = require('./config/providers-catalog');
 const { testProviderKeySafe } = require('./lib/provider-key-test');
+const { buildProvidersPanel } = require('./lib/providers-panel');
 
 function createApp({ db, refreshController, countrySyncController }) {
   const app = express();
@@ -266,6 +268,16 @@ function createApp({ db, refreshController, countrySyncController }) {
     });
   });
 
+  app.get('/api/settings/providers-panel', requireAdmin(db), (req, res) => {
+    setNoStore(res);
+    const serviceKey = resolveServiceKey(req.query.service);
+    res.json({
+      serviceKey,
+      providers: buildProvidersPanel(db, serviceKey),
+      adminConfigured: Boolean(getAdminPasswordRecord(db)),
+    });
+  });
+
   app.put('/api/settings/keys', requireAdmin(db), (req, res) => {
     setNoStore(res);
     const keys = req.body?.keys && typeof req.body.keys === 'object' ? req.body.keys : {};
@@ -302,6 +314,7 @@ function createApp({ db, refreshController, countrySyncController }) {
     const draftKey = String(req.body?.apiKey ?? '').trim();
     const apiKey = draftKey || resolveProviderApiKey(db, keyEnv);
     const result = await testProviderKeySafe(providerDef.providerKey, apiKey);
+    saveProviderConnectivityFromTest(db, result);
     res.status(result.ok ? 200 : 400).json(result);
   });
 
@@ -323,7 +336,9 @@ function createApp({ db, refreshController, countrySyncController }) {
           latencyMs: 0,
         };
       }
-      return testProviderKeySafe(provider.providerKey, apiKey);
+      const result = await testProviderKeySafe(provider.providerKey, apiKey);
+      saveProviderConnectivityFromTest(db, result);
+      return result;
     }));
 
     res.json({

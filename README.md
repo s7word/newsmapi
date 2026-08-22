@@ -196,6 +196,7 @@ POST /api/auth/login
 POST /api/auth/logout
 GET /api/auth/me
 GET /api/settings/keys
+GET /api/settings/providers-panel?service=openai_chatgpt
 PUT /api/settings/keys
 POST /api/settings/keys/test
 POST /api/settings/keys/test-all

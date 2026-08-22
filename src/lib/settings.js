@@ -198,16 +198,41 @@ function login(db, password) {
   return { ok: true, token, expiresInMs: SESSION_TTL_MS };
 }
 
+const PROVIDER_CONNECTIVITY_KEY = 'provider_connectivity_tests';
+
+function getProviderConnectivityMap(db) {
+  ensureSettingsSchema(db);
+  const stored = getSetting(db, PROVIDER_CONNECTIVITY_KEY, {});
+  return stored && typeof stored === 'object' ? stored : {};
+}
+
+function saveProviderConnectivity(db, providerKey, connectivity) {
+  if (!providerKey || !connectivity) return null;
+  ensureSettingsSchema(db);
+  const map = getProviderConnectivityMap(db);
+  map[providerKey] = connectivity;
+  setSetting(db, PROVIDER_CONNECTIVITY_KEY, map);
+  return connectivity;
+}
+
+function saveProviderConnectivityFromTest(db, testResult) {
+  if (!testResult?.providerKey || !testResult.connectivity) return null;
+  return saveProviderConnectivity(db, testResult.providerKey, testResult.connectivity);
+}
+
 module.exports = {
   bootstrapAdminPassword,
   destroySession,
   extractBearerToken,
   getAdminPasswordRecord,
+  getProviderConnectivityMap,
   getSession,
   listProviderKeySettings,
   login,
   requireAdmin,
   resolveProviderApiKey,
+  saveProviderConnectivity,
+  saveProviderConnectivityFromTest,
   setAdminPassword,
   upsertProviderKey,
 };

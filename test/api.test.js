@@ -153,6 +153,16 @@ describe('API endpoints', () => {
     expect(testKey.status).toBe(200);
     expect(testKey.body.ok).toBe(true);
     expect(testKey.body.message).toContain('9.99');
+    expect(testKey.body.connectivity?.balance).toBe('9.99');
+
+    const panel = await request(app)
+      .get('/api/settings/providers-panel?service=openai_chatgpt')
+      .set('Authorization', `Bearer ${token}`);
+    expect(panel.status).toBe(200);
+    expect(Array.isArray(panel.body.providers)).toBe(true);
+    const heroPanel = panel.body.providers.find((provider) => provider.keyEnv === 'HERO_SMS_API_KEY');
+    expect(heroPanel.refresh).toBeTruthy();
+    expect(heroPanel.connectivity?.balance).toBe('9.99');
   });
 
   it('handles malformed API requests without exposing stack traces', async () => {

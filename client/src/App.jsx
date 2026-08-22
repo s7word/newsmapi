@@ -271,6 +271,147 @@ function CountryCombobox({ countries, value, onChange }) {
   );
 }
 
+function formatConnectivityBalance(connectivity) {
+  if (!connectivity) return '—';
+  if (connectivity.balance != null && connectivity.balance !== '') {
+    const currency = connectivity.currency || 'USD';
+    return `${currency} ${connectivity.balance}`;
+  }
+  if (connectivity.countryCount != null) {
+    return `${connectivity.countryCount} 个国家`;
+  }
+  if (connectivity.mode === 'public') return '公开接口';
+  return connectivity.ok ? '已联通' : '—';
+}
+
+const REFRESH_STATUS_LABELS = {
+  idle: '未刷新',
+  success: '正常',
+  stale: '缓存',
+  error: '异常',
+};
+
+const KEY_SOURCE_LABELS = {
+  database: '已存库',
+  env: '环境变量',
+  public: '可无 Key',
+  none: '未配置',
+};
+
+function ProviderSettingsCard({
+  provider,
+  draftValue,
+  onDraftChange,
+  onTest,
+  testing,
+  testResult,
+}) {
+  const connectivity = testResult?.connectivity || provider.connectivity;
+  const refresh = provider.refresh || {};
+  const lastRefreshTime = refresh.lastSuccessAt || refresh.snapshotFetchedAt;
+  const connectivityCheckedAt = connectivity?.checkedAt;
+
+  return (
+    <article className="provider-settings-card">
+      <header className="provider-settings-card__header">
+        <div>
+          <h3>{provider.displayName}</h3>
+          <p className="provider-settings-card__meta">
+            {provider.keyEnv}
+            {' · '}
+            {KEY_SOURCE_LABELS[provider.source] || provider.source}
+            {provider.maskedKey ? ` · ${provider.maskedKey}` : ''}
+          </p>
+        </div>
+        <div className="provider-settings-card__badges">
+          <span className={`provider-settings-badge provider-settings-badge--refresh-${refresh.status || 'idle'}`}>
+            报价 {REFRESH_STATUS_LABELS[refresh.status] || refresh.status || '未刷新'}
+          </span>
+          <span className={
+            connectivity
+              ? (connectivity.ok
+                ? 'provider-settings-badge provider-settings-badge--ok'
+                : 'provider-settings-badge provider-settings-badge--error')
+              : 'provider-settings-badge provider-settings-badge--muted'
+          }>
+            接口 {connectivity ? (connectivity.ok ? '联通' : '失败') : '未测试'}
+          </span>
+        </div>
+      </header>
+
+      <div className="provider-settings-metrics">
+        <div className="provider-settings-metric">
+          <span>余额 / 接口</span>
+          <strong>{formatConnectivityBalance(connectivity)}</strong>
+        </div>
+        <div className="provider-settings-metric">
+          <span>报价条数</span>
+          <strong>{Number.isFinite(Number(refresh.offerCount)) ? refresh.offerCount : '—'}</strong>
+        </div>
+        <div className="provider-settings-metric">
+          <span>最后刷新</span>
+          <strong>{formatTime(lastRefreshTime)}</strong>
+        </div>
+        <div className="provider-settings-metric">
+          <span>接口延迟</span>
+          <strong>
+            {connectivity?.latencyMs
+              ? `${connectivity.latencyMs}ms`
+              : (testResult?.latencyMs ? `${testResult.latencyMs}ms` : '—')}
+          </strong>
+        </div>
+        <div className="provider-settings-metric provider-settings-metric--wide">
+          <span>测试端点</span>
+          <strong>{connectivity?.endpoint || testResult?.endpoint || '—'}</strong>
+        </div>
+        {connectivity?.email ? (
+          <div className="provider-settings-metric provider-settings-metric--wide">
+            <span>账号</span>
+            <strong>{connectivity.email}</strong>
+          </div>
+        ) : null}
+        {connectivityCheckedAt ? (
+          <div className="provider-settings-metric provider-settings-metric--wide">
+            <span>接口检测</span>
+            <strong>{formatTime(connectivityCheckedAt)}</strong>
+          </div>
+        ) : null}
+      </div>
+
+      {(refresh.errorMessage || (connectivity && !connectivity.ok && connectivity.message)) ? (
+        <div className="provider-settings-card__error">
+          {refresh.errorMessage || connectivity.message}
+        </div>
+      ) : null}
+
+      {testResult?.message && testResult.ok ? (
+        <div className="key-test-result key-test-result--ok">
+          {testResult.message}
+          {testResult.latencyMs ? ` · ${testResult.latencyMs}ms` : ''}
+        </div>
+      ) : null}
+
+      <div className="settings-key-row__controls provider-settings-card__controls">
+        <input
+          type="password"
+          autoComplete="off"
+          placeholder={provider.hasKey ? '留空保留现有 Key；输入新值覆盖' : '粘贴 API Key'}
+          value={draftValue}
+          onChange={(event) => onDraftChange(event.target.value)}
+        />
+        <button
+          type="button"
+          className="ghost-button settings-test-button"
+          disabled={testing}
+          onClick={onTest}
+        >
+          {testing ? '测试中…' : '测试连接'}
+        </button>
+      </div>
+    </article>
+  );
+}
+
 function SettingsModal({
   open,
   onClose,
@@ -278,6 +419,9 @@ function SettingsModal({
   onLogin,
   onLogout,
   providers,
+  serviceKey,
+  panelLoading,
+  onReloadPanel,
   onSaveKeys,
   onTestKey,
   onTestAllKeys,
@@ -315,7 +459,10 @@ function SettingsModal({
         <div className="modal-card__header">
           <div>
             <h2>平台设置</h2>
-            <p>登录管理员后可配置各接码平台 API Key，并触发按服务刷新。</p>
+            <p>
+              查看各平台余额、报价刷新与接口联通状态，并配置 API Key。
+              {serviceKey ? ` 当前服务：${serviceKey}` : ''}
+            </p>
           </div>
           <button type="button" className="modal-close" onClick={onClose} aria-label="关闭">×</button>
         </div>
@@ -356,72 +503,92 @@ function SettingsModal({
               await onSaveKeys(draftKeys);
             }}
           >
-            <div className="settings-keys__list">
+            <div className="settings-panel-toolbar">
+              <button
+                type="button"
+                className="ghost-button"
+                disabled={panelLoading || testingAll || Boolean(testingKeyEnv) || saving}
+                onClick={async () => {
+                  setTestingAll(true);
+                  try {
+                    const results = await onTestAllKeys(draftKeys);
+                    const mapped = {};
+                    for (const result of results) {
+                      if (result.keyEnv) mapped[result.keyEnv] = result;
+                    }
+                    setTestResults(mapped);
+                    await onReloadPanel();
+                  } catch (error) {
+                    setTestResults({
+                      __all: { ok: false, message: error.message || '批量测试失败' },
+                    });
+                  } finally {
+                    setTestingAll(false);
+                  }
+                }}
+              >
+                {testingAll ? '检测中…' : '刷新接口状态'}
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                disabled={panelLoading || testingAll || Boolean(testingKeyEnv) || saving}
+                onClick={() => onReloadPanel()}
+              >
+                {panelLoading ? '加载中…' : '刷新面板数据'}
+              </button>
+            </div>
+
+            {panelLoading && !providers?.length ? (
+              <div className="loading-card settings-panel-loading">正在加载平台状态…</div>
+            ) : null}
+
+            <div className="settings-keys__list settings-provider-grid">
               {(providers || []).map((provider) => {
                 const testResult = testResults[provider.keyEnv];
                 const draftValue = draftKeys[provider.keyEnv] ?? '';
                 return (
-                  <div key={provider.keyEnv} className="settings-key-row">
-                    <span>
-                      <strong>{provider.displayName}</strong>
-                      <small>
-                        {provider.keyEnv}
-                        {' · '}
-                        {provider.source === 'database' ? '已存库' : provider.source === 'env' ? '来自环境变量' : provider.publicWithoutKey ? '可无 Key 公开价' : '未配置'}
-                        {provider.maskedKey ? ` · ${provider.maskedKey}` : ''}
-                      </small>
-                    </span>
-                    <div className="settings-key-row__controls">
-                      <input
-                        type="password"
-                        autoComplete="off"
-                        placeholder={provider.hasKey ? '留空保留现有 Key；输入新值覆盖' : '粘贴 API Key'}
-                        value={draftValue}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          setDraftKeys((current) => ({ ...current, [provider.keyEnv]: value }));
-                          setTestResults((current) => {
-                            const next = { ...current };
-                            delete next[provider.keyEnv];
-                            return next;
-                          });
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="ghost-button settings-test-button"
-                        disabled={testingKeyEnv === provider.keyEnv || testingAll}
-                        onClick={async () => {
-                          setTestingKeyEnv(provider.keyEnv);
-                          try {
-                            const result = await onTestKey(provider.keyEnv, draftValue);
-                            setTestResults((current) => ({ ...current, [provider.keyEnv]: result }));
-                          } catch (error) {
-                            setTestResults((current) => ({
-                              ...current,
-                              [provider.keyEnv]: {
-                                ok: false,
-                                message: error.message || '测试失败',
-                              },
-                            }));
-                          } finally {
-                            setTestingKeyEnv('');
-                          }
-                        }}
-                      >
-                        {testingKeyEnv === provider.keyEnv ? '测试中…' : '测试连接'}
-                      </button>
-                    </div>
-                    {testResult ? (
-                      <div className={testResult.ok ? 'key-test-result key-test-result--ok' : 'key-test-result key-test-result--error'}>
-                        {testResult.message}
-                        {testResult.latencyMs ? ` · ${testResult.latencyMs}ms` : ''}
-                      </div>
-                    ) : null}
-                  </div>
+                  <ProviderSettingsCard
+                    key={provider.keyEnv}
+                    provider={provider}
+                    draftValue={draftValue}
+                    testResult={testResult}
+                    testing={testingKeyEnv === provider.keyEnv}
+                    onDraftChange={(value) => {
+                      setDraftKeys((current) => ({ ...current, [provider.keyEnv]: value }));
+                      setTestResults((current) => {
+                        const next = { ...current };
+                        delete next[provider.keyEnv];
+                        return next;
+                      });
+                    }}
+                    onTest={async () => {
+                      setTestingKeyEnv(provider.keyEnv);
+                      try {
+                        const result = await onTestKey(provider.keyEnv, draftValue);
+                        setTestResults((current) => ({ ...current, [provider.keyEnv]: result }));
+                        await onReloadPanel();
+                      } catch (error) {
+                        setTestResults((current) => ({
+                          ...current,
+                          [provider.keyEnv]: {
+                            ok: false,
+                            message: error.message || '测试失败',
+                          },
+                        }));
+                      } finally {
+                        setTestingKeyEnv('');
+                      }
+                    }}
+                  />
                 );
               })}
             </div>
+            {testResults.__all ? (
+              <div className={testResults.__all.ok ? 'success-banner' : 'error-banner'}>
+                {testResults.__all.message}
+              </div>
+            ) : null}
             {message ? <div className="success-banner">{message}</div> : null}
             <div className="settings-actions">
               <button type="submit" className="primary-button" disabled={saving || testingAll}>
@@ -440,6 +607,7 @@ function SettingsModal({
                       if (result.keyEnv) mapped[result.keyEnv] = result;
                     }
                     setTestResults(mapped);
+                    await onReloadPanel();
                   } catch (error) {
                     setTestResults({
                       __all: { ok: false, message: error.message || '批量测试失败' },
@@ -484,6 +652,8 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(Boolean(getAuthToken()));
   const [keyProviders, setKeyProviders] = useState([]);
+  const [panelProviders, setPanelProviders] = useState([]);
+  const [panelLoading, setPanelLoading] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState('');
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [refreshingService, setRefreshingService] = useState(false);
@@ -512,6 +682,30 @@ function App() {
     setAuthenticated(true);
   }
 
+  async function loadProvidersPanel({ silent = false } = {}) {
+    if (!silent) setPanelLoading(true);
+    try {
+      const response = await fetch(
+        `/api/settings/providers-panel?service=${encodeURIComponent(filters.service)}`,
+        { headers: authHeaders() },
+      );
+      if (!response.ok) {
+        if (response.status === 401) {
+          setAuthenticated(false);
+          setAuthToken('');
+        }
+        throw new Error('加载平台状态失败');
+      }
+      const payload = await response.json();
+      setPanelProviders(payload.providers || []);
+      setKeyProviders(payload.providers || []);
+      setAuthenticated(true);
+      return payload;
+    } finally {
+      if (!silent) setPanelLoading(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -535,7 +729,7 @@ function App() {
         setCompare(comparePayload);
         if (getAuthToken()) {
           try {
-            await loadKeySettings();
+            await loadProvidersPanel({ silent: true });
           } catch {
             setAuthenticated(false);
           }
@@ -552,6 +746,11 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!settingsOpen || !authenticated) return;
+    loadProvidersPanel().catch(() => {});
+  }, [settingsOpen, authenticated, filters.service]);
 
   useEffect(() => {
     if (!meta) return;
@@ -674,7 +873,7 @@ function App() {
     }
     setAuthToken(payload.token);
     setAuthenticated(true);
-    await loadKeySettings();
+    await loadProvidersPanel();
   }
 
   async function handleLogout() {
@@ -685,6 +884,7 @@ function App() {
     setAuthToken('');
     setAuthenticated(false);
     setKeyProviders([]);
+    setPanelProviders([]);
     setSettingsMessage('');
   }
 
@@ -802,6 +1002,7 @@ function App() {
       const payload = await response.json();
       setKeyProviders(payload.providers || []);
       setSettingsMessage('已保存，正在刷新当前服务报价…');
+      await loadProvidersPanel({ silent: true });
       const refreshResult = await handleRefreshCurrentService({ silent: true });
       setSettingsMessage(
         refreshResult.ok
@@ -1099,7 +1300,10 @@ function App() {
         authenticated={authenticated}
         onLogin={handleLogin}
         onLogout={handleLogout}
-        providers={keyProviders}
+        providers={panelProviders.length ? panelProviders : keyProviders}
+        serviceKey={filters.service}
+        panelLoading={panelLoading}
+        onReloadPanel={() => loadProvidersPanel()}
         onSaveKeys={handleSaveKeys}
         onTestKey={handleTestKey}
         onTestAllKeys={handleTestAllKeys}

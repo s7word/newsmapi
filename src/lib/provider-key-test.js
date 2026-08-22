@@ -37,15 +37,17 @@ function parseActivateBalance(text) {
   }
   if (trimmed.startsWith('ACCESS_BALANCE:')) {
     const balance = trimmed.slice('ACCESS_BALANCE:'.length).trim();
-    return {
-      message: `连接成功 · 余额 ${balance} USD`,
-      details: { balance, currency: 'USD' },
-    };
+  return {
+    message: `连接成功 · 余额 ${balance} USD`,
+    details: { balance, currency: 'USD' },
+    endpoint: 'getBalance',
+  };
   }
   if (/^\d+(\.\d+)?$/.test(trimmed)) {
     return {
       message: `连接成功 · 余额 ${trimmed}`,
-      details: { balance: trimmed },
+      details: { balance: trimmed, currency: 'USD' },
+      endpoint: 'getBalance',
     };
   }
   throw new Error(trimmed.length > 120 ? `${trimmed.slice(0, 120)}…` : trimmed);
@@ -73,6 +75,7 @@ async function test5sim(baseUrl, apiKey) {
     return {
       message: '公开价格接口可用（无需 Key）',
       details: { mode: 'public' },
+      endpoint: 'GET /guest/prices',
     };
   }
 
@@ -91,9 +94,12 @@ async function test5sim(baseUrl, apiKey) {
   return {
     message: `连接成功${identityText}${balanceText}`,
     details: {
-      balance,
+      balance: balance !== '' && balance !== undefined ? String(balance) : undefined,
+      currency: balance !== '' && balance !== undefined ? 'USD' : undefined,
       email: email || undefined,
+      rating: profile?.rating,
     },
+    endpoint: 'GET /user/profile',
   };
 }
 
@@ -103,6 +109,7 @@ async function testSmsbower(definition, apiKey) {
     return {
       message: '公开价格接口可用（无需 Key）',
       details: { mode: 'public' },
+      endpoint: 'GET /guest/prices',
     };
   }
   return await testActivateCompatible(definition.baseUrl, apiKey);
@@ -117,6 +124,7 @@ async function testNexsms(baseUrl, apiKey) {
   return {
     message: `连接成功 · ${countries.length} 个国家`,
     details: { countryCount: countries.length },
+    endpoint: 'GET /countries',
   };
 }
 
@@ -155,7 +163,25 @@ async function testSmsPool(baseUrl, apiKey) {
   const balance = payload.balance ?? payload.Balance ?? '';
   return {
     message: `连接成功 · 余额 ${balance}`,
-    details: { balance },
+    details: { balance: String(balance), currency: 'USD' },
+    endpoint: 'POST /request/balance',
+  };
+}
+
+function buildConnectivityFromResult(result) {
+  const details = result.details || {};
+  return {
+    ok: Boolean(result.ok),
+    message: result.message || '',
+    balance: details.balance != null && details.balance !== '' ? String(details.balance) : null,
+    currency: details.currency || (details.balance != null && details.balance !== '' ? 'USD' : null),
+    email: details.email || null,
+    rating: details.rating != null ? String(details.rating) : null,
+    countryCount: Number.isFinite(Number(details.countryCount)) ? Number(details.countryCount) : null,
+    mode: details.mode || (result.ok ? 'authenticated' : null),
+    endpoint: result.endpoint || '',
+    latencyMs: Number(result.latencyMs || 0),
+    checkedAt: new Date().toISOString(),
   };
 }
 
@@ -205,6 +231,14 @@ async function testProviderKey(providerKey, apiKey) {
     keyEnv: definition.keyEnv,
     message: result.message,
     details: result.details || {},
+    endpoint: result.endpoint || '',
+    connectivity: buildConnectivityFromResult({
+      ok: true,
+      message: result.message,
+      details: result.details,
+      endpoint: result.endpoint,
+      latencyMs: Date.now() - startedAt,
+    }),
     latencyMs: Date.now() - startedAt,
   };
 }
@@ -215,19 +249,29 @@ async function testProviderKeySafe(providerKey, apiKey) {
   try {
     return await testProviderKey(providerKey, apiKey);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
       providerKey,
       displayName: definition?.displayName || providerKey,
       keyEnv: definition?.keyEnv || '',
-      message: error instanceof Error ? error.message : String(error),
+      message,
       details: {},
+      endpoint: '',
+      connectivity: buildConnectivityFromResult({
+        ok: false,
+        message,
+        details: {},
+        endpoint: '',
+        latencyMs: Date.now() - startedAt,
+      }),
       latencyMs: Date.now() - startedAt,
     };
   }
 }
 
 module.exports = {
+  buildConnectivityFromResult,
   testProviderKey,
   testProviderKeySafe,
 };
