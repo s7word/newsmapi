@@ -286,6 +286,28 @@ async function testPvapins(apiKey) {
   };
 }
 
+async function testSimsms(apiKey) {
+  const payload = await getJson(buildUrl('https://simsms.org/priemnik.php', {
+    metod: 'get_balance',
+    apikey: apiKey,
+  }), { timeoutMs: 15000 });
+
+  if (String(payload?.response) === 'error') {
+    const message = String(payload?.error_msg || 'SimSMS 错误');
+    if (/api key|bad key|not found/i.test(message)) {
+      throw new Error('API Key 无效');
+    }
+    throw new Error(message);
+  }
+
+  const balance = payload?.balance ?? '';
+  return {
+    message: `连接成功 · 余额 ${balance} USD`,
+    details: { balance: String(balance), currency: 'USD' },
+    endpoint: 'GET /priemnik.php?metod=get_balance',
+  };
+}
+
 async function testGiveSms(apiKey) {
   const payload = await getJson(buildUrl('https://give-sms.com/api/v1/', {
     method: 'getbalance',
@@ -472,6 +494,9 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'pvapins':
       result = await testPvapins(trimmedKey);
+      break;
+    case 'simsms':
+      result = await testSimsms(trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);

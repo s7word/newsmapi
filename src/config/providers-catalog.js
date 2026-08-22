@@ -159,6 +159,14 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.PVAPINS_REFRESH_INTERVAL_MS || 300000),
   },
+  {
+    providerKey: 'simsms',
+    displayName: 'SimSMS',
+    baseUrl: 'https://simsms.org/priemnik.php',
+    keyEnv: 'SIMSMS_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.SIMSMS_REFRESH_INTERVAL_MS || 300000),
+  },
 ];
 
 function listProviders() {
