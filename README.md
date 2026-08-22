@@ -145,6 +145,8 @@ SMSBower / 5SIM 支持无 Key 拉取公开报价，便于本地先跑通看板�
 | SimSMS | https://simsms.org/ |
 | GetSMS | https://getsms.online/ |
 
+GetSMS 需在 Profile 生成 API Key，并同时提供账号邮箱/用户名：环境变量 `GETSMS_USER`，或在设置里填写 `user|api_key`（例如 `you@mail.com|你的API密钥`）。文档：https://getsms.online/api_command_reference.php
+
 平台服务码也可以通过环境变量覆盖：
 
 ```env
