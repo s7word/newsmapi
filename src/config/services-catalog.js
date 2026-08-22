@@ -24,6 +24,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'dr',
     'sms-bus': 'openai',
     'vibe-sms': 'dr',
+    cyberyozh: 'dr',
   },
   telegram: {
     onlinesim: 'telegram',
@@ -33,6 +34,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'tg',
     'sms-bus': 'tg',
     'vibe-sms': 'tg',
+    cyberyozh: 'tg',
   },
   whatsapp: {
     onlinesim: 'whatsapp',
@@ -42,6 +44,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'wa',
     'sms-bus': 'wa',
     'vibe-sms': 'wa',
+    cyberyozh: 'wa',
   },
   google: {
     onlinesim: 'google',
@@ -51,6 +54,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'go',
     'sms-bus': 'google',
     'vibe-sms': 'go',
+    cyberyozh: 'go',
   },
   discord: {
     onlinesim: 'discord',
@@ -60,6 +64,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'ds',
     'sms-bus': 'discord',
     'vibe-sms': 'ds',
+    cyberyozh: 'ds',
   },
   microsoft: {
     onlinesim: 'microsoft',
@@ -69,6 +74,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'mm',
     'sms-bus': 'microsoft',
     'vibe-sms': 'mm',
+    cyberyozh: 'mm',
   },
   twitter: {
     onlinesim: 'twitter',
@@ -78,6 +84,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'tw',
     'sms-bus': 'tw',
     'vibe-sms': 'tw',
+    cyberyozh: 'tw',
   },
   instagram: {
     onlinesim: 'instagram',
@@ -87,6 +94,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'ig',
     'sms-bus': 'ig',
     'vibe-sms': 'ig',
+    cyberyozh: 'ig',
   },
   facebook: {
     onlinesim: '3223',
@@ -96,6 +104,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'fb',
     'sms-bus': 'fb',
     'vibe-sms': 'fb',
+    cyberyozh: 'fb',
   },
   tiktok: {
     onlinesim: 'tiktok',
@@ -105,6 +114,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'lf',
     'sms-bus': 'tk',
     'vibe-sms': 'lf',
+    cyberyozh: 'lf',
   },
   amazon: {
     onlinesim: 'amazon',
@@ -114,6 +124,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'am',
     'sms-bus': 'amz',
     'vibe-sms': 'am',
+    cyberyozh: 'am',
   },
   apple: {
     onlinesim: 'apple',
@@ -123,6 +134,7 @@ const EXTENDED_PROVIDER_CODES = {
     'sms-rooms': 'wx',
     'sms-bus': 'apple',
     'vibe-sms': 'wx',
+    cyberyozh: 'wx',
   },
 };
 

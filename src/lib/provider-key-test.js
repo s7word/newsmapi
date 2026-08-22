@@ -186,6 +186,38 @@ async function testVibeSms(apiKey) {
   };
 }
 
+async function testCyberYozh(apiKey) {
+  const payload = await getJson(buildUrl('https://app.cyberyozh.com/api/v1/numbers/search/', {
+    provider: 'virtual',
+    period: 'MIN_15',
+    service_name: 'telegram',
+    page_size: 1,
+  }), {
+    headers: {
+      Accept: 'application/json',
+      'X-Api-Key': apiKey,
+    },
+    timeoutMs: 15000,
+  });
+
+  if (payload?.detail && /invalid api key/i.test(String(payload.detail))) {
+    throw new Error('API Key 无效 (Invalid API key)');
+  }
+
+  const sample = Array.isArray(payload?.results) ? payload.results[0] : null;
+  const priceText = sample?.price != null ? ` · 示例报价 ${sample.price} USD` : '';
+  return {
+    message: `连接成功 · SMS 搜索接口可用${priceText}`,
+    details: {
+      mode: 'search',
+      sampleService: sample?.service_name || undefined,
+      samplePrice: sample?.price != null ? String(sample.price) : undefined,
+      currency: sample?.price != null ? 'USD' : undefined,
+    },
+    endpoint: 'GET /api/v1/numbers/search/',
+  };
+}
+
 async function testSmspva(apiKey) {
   const response = await request('https://api.smspva.com/activation/balance', {
     headers: { apikey: apiKey, Accept: 'application/json' },
@@ -335,6 +367,9 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'vibe-sms':
       result = await testVibeSms(trimmedKey);
+      break;
+    case 'cyberyozh':
+      result = await testCyberYozh(trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);

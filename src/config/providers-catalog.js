@@ -111,6 +111,14 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.VIBE_SMS_REFRESH_INTERVAL_MS || 180000),
   },
+  {
+    providerKey: 'cyberyozh',
+    displayName: 'CyberYozh',
+    baseUrl: 'https://app.cyberyozh.com/api/v1',
+    keyEnv: 'CYBERYOZH_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.CYBERYOZH_REFRESH_INTERVAL_MS || 180000),
+  },
 ];
 
 function listProviders() {
