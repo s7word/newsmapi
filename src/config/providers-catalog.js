@@ -143,6 +143,14 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.SMS365_REFRESH_INTERVAL_MS || 180000),
   },
+  {
+    providerKey: 'juicy-sms',
+    displayName: 'JuicySMS',
+    baseUrl: 'https://juicysms.com/api/v2',
+    keyEnv: 'JUICYSMS_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.JUICYSMS_REFRESH_INTERVAL_MS || 180000),
+  },
 ];
 
 function listProviders() {

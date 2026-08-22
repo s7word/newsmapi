@@ -239,6 +239,32 @@ async function testVakSms(apiKey) {
   };
 }
 
+async function testJuicySms(apiKey) {
+  try {
+    const payload = await getJson('https://juicysms.com/api/v2/account', {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
+      },
+      timeoutMs: 15000,
+    });
+
+    const balance = payload?.balance?.amount ?? '';
+    const currency = payload?.balance?.currency || 'EUR';
+    return {
+      message: `连接成功 · 余额 ${balance} ${currency}`,
+      details: { balance: String(balance), currency },
+      endpoint: 'GET /api/v2/account',
+    };
+  } catch (error) {
+    const body = String(error?.body || error?.message || '');
+    if (/invalid_token|unauthenticated/i.test(body)) {
+      throw new Error('API Key 无效 (invalid_token)');
+    }
+    throw error;
+  }
+}
+
 async function testGiveSms(apiKey) {
   const payload = await getJson(buildUrl('https://give-sms.com/api/v1/', {
     method: 'getbalance',
@@ -419,6 +445,9 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'give-sms':
       result = await testGiveSms(trimmedKey);
+      break;
+    case 'juicy-sms':
+      result = await testJuicySms(trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);

@@ -28,6 +28,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'dr',
     'give-sms': 'dr',
     '365sms': 'dr',
+    'juicy-sms': 'dr',
   },
   telegram: {
     onlinesim: 'telegram',
@@ -41,6 +42,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'tg',
     'give-sms': 'tg',
     '365sms': 'tg',
+    'juicy-sms': 'tg',
   },
   whatsapp: {
     onlinesim: 'whatsapp',
@@ -54,6 +56,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'wa',
     'give-sms': 'wa',
     '365sms': 'wa',
+    'juicy-sms': 'wa',
   },
   google: {
     onlinesim: 'google',
@@ -67,6 +70,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'go',
     'give-sms': 'go',
     '365sms': 'go',
+    'juicy-sms': 'go',
   },
   discord: {
     onlinesim: 'discord',
@@ -80,6 +84,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'ds',
     'give-sms': 'ds',
     '365sms': 'ds',
+    'juicy-sms': 'ds',
   },
   microsoft: {
     onlinesim: 'microsoft',
@@ -93,6 +98,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'mm',
     'give-sms': 'mm',
     '365sms': 'mm',
+    'juicy-sms': 'mm',
   },
   twitter: {
     onlinesim: 'twitter',
@@ -106,6 +112,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'tw',
     'give-sms': 'tw',
     '365sms': 'tw',
+    'juicy-sms': 'tw',
   },
   instagram: {
     onlinesim: 'instagram',
@@ -119,6 +126,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'ig',
     'give-sms': 'ig',
     '365sms': 'ig',
+    'juicy-sms': 'ig',
   },
   facebook: {
     onlinesim: '3223',
@@ -132,6 +140,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'fb',
     'give-sms': 'fb',
     '365sms': 'fb',
+    'juicy-sms': 'fb',
   },
   tiktok: {
     onlinesim: 'tiktok',
@@ -145,6 +154,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'lf',
     'give-sms': 'lf',
     '365sms': 'lf',
+    'juicy-sms': 'lf',
   },
   amazon: {
     onlinesim: 'amazon',
@@ -158,6 +168,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'am',
     'give-sms': 'am',
     '365sms': 'am',
+    'juicy-sms': 'am',
   },
   apple: {
     onlinesim: 'apple',
@@ -171,6 +182,7 @@ const EXTENDED_PROVIDER_CODES = {
     'vak-sms': 'wx',
     'give-sms': 'wx',
     '365sms': 'wx',
+    'juicy-sms': 'wx',
   },
 };
 
