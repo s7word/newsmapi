@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { createDatabase, saveProviderSnapshot, saveProviderState } from '../src/lib/db';
 import { setAdminPassword, upsertProviderKey } from '../src/lib/settings';
@@ -111,7 +111,7 @@ describe('API endpoints', () => {
     expect(response.body.accepted).toBe(false);
   });
 
-  it('supports admin login and key settings', async () => {
+  it('supports admin login, key settings, and key connectivity tests', async () => {
     const { app, db } = setupApp();
     const login = await request(app)
       .post('/api/auth/login')
@@ -138,6 +138,21 @@ describe('API endpoints', () => {
     const hero = save.body.providers.find((provider) => provider.keyEnv === 'HERO_SMS_API_KEY');
     expect(hero.hasKey).toBe(true);
     expect(hero.source).toBe('database');
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'text/plain' }),
+      text: async () => 'ACCESS_BALANCE:9.99',
+    });
+
+    const testKey = await request(app)
+      .post('/api/settings/keys/test')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ keyEnv: 'HERO_SMS_API_KEY' });
+    expect(testKey.status).toBe(200);
+    expect(testKey.body.ok).toBe(true);
+    expect(testKey.body.message).toContain('9.99');
   });
 
   it('handles malformed API requests without exposing stack traces', async () => {

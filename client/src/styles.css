@@ -241,9 +241,15 @@ select {
 
 .project-links {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 18px;
+}
+
+button.project-link {
+  font: inherit;
+  cursor: pointer;
+  width: 100%;
 }
 
 .project-link {
@@ -875,5 +881,39 @@ select {
 
   .service-switch__button {
     font-size: 0.85rem;
+  }
+}
+
+.settings-key-row__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-test-button {
+  white-space: nowrap;
+  padding: 10px 12px;
+}
+
+.key-test-result {
+  font-size: 0.86rem;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.key-test-result--ok {
+  background: rgba(21, 157, 93, 0.12);
+  color: var(--success);
+}
+
+.key-test-result--error {
+  background: rgba(217, 72, 95, 0.12);
+  color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .settings-key-row__controls {
+    grid-template-columns: 1fr;
   }
 }

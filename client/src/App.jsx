@@ -279,18 +279,26 @@ function SettingsModal({
   onLogout,
   providers,
   onSaveKeys,
+  onTestKey,
+  onTestAllKeys,
   saving,
   message,
 }) {
   const [password, setPassword] = useState('');
   const [draftKeys, setDraftKeys] = useState({});
   const [loginError, setLoginError] = useState('');
+  const [testResults, setTestResults] = useState({});
+  const [testingKeyEnv, setTestingKeyEnv] = useState('');
+  const [testingAll, setTestingAll] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setDraftKeys({});
     setPassword('');
     setLoginError('');
+    setTestResults({});
+    setTestingKeyEnv('');
+    setTestingAll(false);
   }, [open, authenticated]);
 
   if (!open) return null;
@@ -349,34 +357,99 @@ function SettingsModal({
             }}
           >
             <div className="settings-keys__list">
-              {(providers || []).map((provider) => (
-                <label key={provider.keyEnv} className="settings-key-row">
-                  <span>
-                    <strong>{provider.displayName}</strong>
-                    <small>
-                      {provider.keyEnv}
-                      {' · '}
-                      {provider.source === 'database' ? '已存库' : provider.source === 'env' ? '来自环境变量' : provider.publicWithoutKey ? '可无 Key 公开价' : '未配置'}
-                      {provider.maskedKey ? ` · ${provider.maskedKey}` : ''}
-                    </small>
-                  </span>
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    placeholder={provider.hasKey ? '留空保留现有 Key；输入新值覆盖' : '粘贴 API Key'}
-                    value={draftKeys[provider.keyEnv] ?? ''}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      setDraftKeys((current) => ({ ...current, [provider.keyEnv]: value }));
-                    }}
-                  />
-                </label>
-              ))}
+              {(providers || []).map((provider) => {
+                const testResult = testResults[provider.keyEnv];
+                const draftValue = draftKeys[provider.keyEnv] ?? '';
+                return (
+                  <div key={provider.keyEnv} className="settings-key-row">
+                    <span>
+                      <strong>{provider.displayName}</strong>
+                      <small>
+                        {provider.keyEnv}
+                        {' · '}
+                        {provider.source === 'database' ? '已存库' : provider.source === 'env' ? '来自环境变量' : provider.publicWithoutKey ? '可无 Key 公开价' : '未配置'}
+                        {provider.maskedKey ? ` · ${provider.maskedKey}` : ''}
+                      </small>
+                    </span>
+                    <div className="settings-key-row__controls">
+                      <input
+                        type="password"
+                        autoComplete="off"
+                        placeholder={provider.hasKey ? '留空保留现有 Key；输入新值覆盖' : '粘贴 API Key'}
+                        value={draftValue}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setDraftKeys((current) => ({ ...current, [provider.keyEnv]: value }));
+                          setTestResults((current) => {
+                            const next = { ...current };
+                            delete next[provider.keyEnv];
+                            return next;
+                          });
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="ghost-button settings-test-button"
+                        disabled={testingKeyEnv === provider.keyEnv || testingAll}
+                        onClick={async () => {
+                          setTestingKeyEnv(provider.keyEnv);
+                          try {
+                            const result = await onTestKey(provider.keyEnv, draftValue);
+                            setTestResults((current) => ({ ...current, [provider.keyEnv]: result }));
+                          } catch (error) {
+                            setTestResults((current) => ({
+                              ...current,
+                              [provider.keyEnv]: {
+                                ok: false,
+                                message: error.message || '测试失败',
+                              },
+                            }));
+                          } finally {
+                            setTestingKeyEnv('');
+                          }
+                        }}
+                      >
+                        {testingKeyEnv === provider.keyEnv ? '测试中…' : '测试连接'}
+                      </button>
+                    </div>
+                    {testResult ? (
+                      <div className={testResult.ok ? 'key-test-result key-test-result--ok' : 'key-test-result key-test-result--error'}>
+                        {testResult.message}
+                        {testResult.latencyMs ? ` · ${testResult.latencyMs}ms` : ''}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
             {message ? <div className="success-banner">{message}</div> : null}
             <div className="settings-actions">
-              <button type="submit" className="primary-button" disabled={saving}>
+              <button type="submit" className="primary-button" disabled={saving || testingAll}>
                 {saving ? '保存中...' : '保存 Key'}
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                disabled={saving || testingAll || Boolean(testingKeyEnv)}
+                onClick={async () => {
+                  setTestingAll(true);
+                  try {
+                    const results = await onTestAllKeys(draftKeys);
+                    const mapped = {};
+                    for (const result of results) {
+                      if (result.keyEnv) mapped[result.keyEnv] = result;
+                    }
+                    setTestResults(mapped);
+                  } catch (error) {
+                    setTestResults({
+                      __all: { ok: false, message: error.message || '批量测试失败' },
+                    });
+                  } finally {
+                    setTestingAll(false);
+                  }
+                }}
+              >
+                {testingAll ? '测试中…' : '测试全部'}
               </button>
               <button type="button" className="ghost-button" onClick={onLogout}>退出登录</button>
             </div>
@@ -611,6 +684,40 @@ function App() {
     setAuthenticated(false);
     setKeyProviders([]);
     setSettingsMessage('');
+  }
+
+  async function handleTestKey(keyEnv, apiKey) {
+    const body = { keyEnv };
+    if (String(apiKey || '').trim()) {
+      body.apiKey = String(apiKey).trim();
+    }
+    const response = await fetch('/api/settings/keys/test', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(),
+      },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json();
+    if (!response.ok && !payload.message) {
+      throw new Error('测试请求失败');
+    }
+    return payload;
+  }
+
+  async function handleTestAllKeys(draftKeysPayload) {
+    const response = await fetch('/api/settings/keys/test-all', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(),
+      },
+      body: JSON.stringify({ keys: draftKeysPayload }),
+    });
+    if (!response.ok) throw new Error('批量测试失败');
+    const payload = await response.json();
+    return payload.results || [];
   }
 
   async function handleSaveKeys(draftKeys) {
@@ -919,6 +1026,8 @@ function App() {
         onLogout={handleLogout}
         providers={keyProviders}
         onSaveKeys={handleSaveKeys}
+        onTestKey={handleTestKey}
+        onTestAllKeys={handleTestAllKeys}
         saving={settingsSaving}
         message={settingsMessage}
       />

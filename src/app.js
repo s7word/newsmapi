@@ -30,6 +30,7 @@ const {
   upsertProviderKey,
 } = require('./lib/settings');
 const { listProviders } = require('./config/providers-catalog');
+const { testProviderKeySafe } = require('./lib/provider-key-test');
 
 function createApp({ db, refreshController, countrySyncController }) {
   const app = express();
@@ -286,6 +287,48 @@ function createApp({ db, refreshController, countrySyncController }) {
       ok: true,
       updated,
       providers: listProviderKeySettings(db),
+    });
+  });
+
+  app.post('/api/settings/keys/test', requireAdmin(db), async (req, res) => {
+    setNoStore(res);
+    const keyEnv = String(req.body?.keyEnv || '').trim();
+    const providerDef = listProviders().find((provider) => provider.keyEnv === keyEnv);
+    if (!providerDef) {
+      res.status(400).json({ ok: false, error: 'invalid_key_env' });
+      return;
+    }
+
+    const draftKey = String(req.body?.apiKey ?? '').trim();
+    const apiKey = draftKey || resolveProviderApiKey(db, keyEnv);
+    const result = await testProviderKeySafe(providerDef.providerKey, apiKey);
+    res.status(result.ok ? 200 : 400).json(result);
+  });
+
+  app.post('/api/settings/keys/test-all', requireAdmin(db), async (req, res) => {
+    setNoStore(res);
+    const draftKeys = req.body?.keys && typeof req.body.keys === 'object' ? req.body.keys : {};
+    const providers = listProviders();
+    const results = await Promise.all(providers.map(async (provider) => {
+      const draftKey = String(draftKeys[provider.keyEnv] ?? '').trim();
+      const apiKey = draftKey || resolveProviderApiKey(db, provider.keyEnv);
+      if (!apiKey && !provider.publicWithoutKey) {
+        return {
+          ok: false,
+          providerKey: provider.providerKey,
+          displayName: provider.displayName,
+          keyEnv: provider.keyEnv,
+          message: '未配置 API Key',
+          details: {},
+          latencyMs: 0,
+        };
+      }
+      return testProviderKeySafe(provider.providerKey, apiKey);
+    }));
+
+    res.json({
+      ok: results.every((result) => result.ok),
+      results,
     });
   });
 
