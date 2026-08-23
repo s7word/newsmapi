@@ -4,6 +4,7 @@ import { createApp } from '../src/app';
 import { createDatabase, saveProviderSnapshot } from '../src/lib/db';
 import { setAdminPassword, upsertProviderKey } from '../src/lib/settings';
 import { listGatewayProviders, supportsActivateProxy } from '../src/lib/gateway/protocol-registry';
+import { supportsUnifiedOrders as orderCapable } from '../src/lib/gateway/order-bridge';
 
 describe('gateway protocol registry', () => {
   it('lists all integrated providers with protocol metadata', () => {
@@ -12,6 +13,9 @@ describe('gateway protocol registry', () => {
     expect(providers.every((provider) => provider.protocol && provider.capabilities?.length)).toBe(true);
     expect(supportsActivateProxy('hero-sms')).toBe(true);
     expect(supportsActivateProxy('getsms')).toBe(false);
+    expect(orderCapable('hero-sms')).toBe(true);
+    expect(orderCapable('getsms')).toBe(true);
+    expect(orderCapable('smspool')).toBe(false);
   });
 });
 
@@ -92,5 +96,59 @@ describe('gateway API', () => {
 
     expect(res.status).toBe(200);
     expect(res.text).toBe('ACCESS_BALANCE:12.5');
+  });
+
+  it('rejects unified order without auth', async () => {
+    const app = setupApp();
+    const res = await request(app)
+      .post('/api/gateway/v1/order')
+      .send({ provider: 'hero-sms', service: 'telegram', country: 12 });
+    expect(res.status).toBe(401);
+  });
+
+  it('creates and polls unified order via activate protocol', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: async () => JSON.stringify({
+          activationId: 999,
+          phoneNumber: '+15551234567',
+          activationCost: 0.42,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/plain' }),
+        text: async () => 'STATUS_WAIT_CODE',
+      });
+
+    const app = setupApp();
+    const createRes = await request(app)
+      .post('/api/gateway/v1/order')
+      .query({ api_key: 'gateway-test-token' })
+      .send({
+        provider: 'hero-sms',
+        service: 'telegram',
+        country: 12,
+      });
+
+    expect(createRes.status).toBe(200);
+    expect(createRes.body.status).toBe('ok');
+    expect(createRes.body.activationId).toBe('999');
+    expect(createRes.body.orderState).toBe('waiting_code');
+
+    const statusRes = await request(app)
+      .get('/api/gateway/v1/order')
+      .query({
+        provider: 'hero-sms',
+        activationId: '999',
+        api_key: 'gateway-test-token',
+      });
+
+    expect(statusRes.status).toBe(200);
+    expect(statusRes.body.orderState).toBe('waiting_code');
   });
 });

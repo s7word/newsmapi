@@ -38,6 +38,9 @@ const {
   getUnifiedBalance,
   getUnifiedPrices,
   proxyActivate,
+  createUnifiedOrder,
+  getUnifiedOrderStatus,
+  cancelUnifiedOrder,
   requireGatewayAuth,
 } = require('./lib/gateway');
 
@@ -535,6 +538,122 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
         status: 'error',
         code: 'activate_proxy_failed',
         message,
+      });
+    }
+  });
+
+  function readOrderParams(req) {
+    const source = { ...req.query, ...req.body };
+    return {
+      providerKey: String(source.provider || '').trim(),
+      serviceKey: String(source.service || 'openai_chatgpt').trim(),
+      activationId: String(source.activationId || source.id || '').trim(),
+      country: source.country,
+      operator: source.operator,
+      maxPrice: source.maxPrice,
+      providerIds: source.providerIds,
+      serviceId: source.serviceId,
+      state: source.state,
+      areacode: source.areacode,
+      markup: source.markup,
+    };
+  }
+
+  app.post('/api/gateway/v1/order', async (req, res) => {
+    setNoStore(res);
+    const auth = requireGatewayAuth(req, res, db);
+    if (!auth) return;
+
+    const params = readOrderParams(req);
+    if (!params.providerKey) {
+      res.status(400).json({
+        schema: 'smsbazaar.gateway.v1',
+        status: 'error',
+        code: 'bad_request',
+        message: '缺少 provider 参数',
+      });
+      return;
+    }
+
+    try {
+      const payload = await createUnifiedOrder({
+        db,
+        auth,
+        ...params,
+      });
+      res.status(payload.status === 'ok' ? 200 : 400).json(payload);
+    } catch (error) {
+      res.status(400).json({
+        schema: 'smsbazaar.gateway.v1',
+        status: 'error',
+        code: 'order_failed',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.get('/api/gateway/v1/order', async (req, res) => {
+    setNoStore(res);
+    const auth = requireGatewayAuth(req, res, db);
+    if (!auth) return;
+
+    const params = readOrderParams(req);
+    if (!params.providerKey || !params.activationId) {
+      res.status(400).json({
+        schema: 'smsbazaar.gateway.v1',
+        status: 'error',
+        code: 'bad_request',
+        message: '缺少 provider 或 activationId 参数',
+      });
+      return;
+    }
+
+    try {
+      const payload = await getUnifiedOrderStatus({
+        db,
+        auth,
+        ...params,
+      });
+      res.status(payload.status === 'ok' ? 200 : 400).json(payload);
+    } catch (error) {
+      res.status(400).json({
+        schema: 'smsbazaar.gateway.v1',
+        status: 'error',
+        code: 'order_status_failed',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.post('/api/gateway/v1/order/cancel', async (req, res) => {
+    setNoStore(res);
+    const auth = requireGatewayAuth(req, res, db);
+    if (!auth) return;
+
+    const params = readOrderParams(req);
+    if (!params.providerKey || !params.activationId) {
+      res.status(400).json({
+        schema: 'smsbazaar.gateway.v1',
+        status: 'error',
+        code: 'bad_request',
+        message: '缺少 provider 或 activationId 参数',
+      });
+      return;
+    }
+
+    try {
+      const payload = await cancelUnifiedOrder({
+        db,
+        auth,
+        ...params,
+      });
+      res.status(payload.status === 'ok' ? 200 : 400).json(payload);
+    } catch (error) {
+      res.status(400).json({
+        schema: 'smsbazaar.gateway.v1',
+        status: 'error',
+        code: 'order_cancel_failed',
+        message: error instanceof Error ? error.message : String(error),
       });
     }
   });

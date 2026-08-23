@@ -219,8 +219,9 @@ npm run sync:countries
 
 各上游平台的鉴权方式、路径和返回格式差异很大。SMSBazaar 在适配层之上增加了 **统一网关**，对外提供两类能力：
 
-1. **标准化 JSON API**（`smsbazaar.gateway.v1`）——比价、余额、协议元数据使用同一响应结构。
+1. **标准化 JSON API**（`smsbazaar.gateway.v1`）——比价、余额、取号、查码、取消订单与协议元数据使用同一响应结构。
 2. **SMS-Activate 协议中转**——对 Hero / Grizzly / SMS-Rooms / 365SMS / Vak SMS 等 `handler_api.php` 平台，可按 SMS-Activate 习惯转发 `getBalance`、`getPrices`、`getNumber` 等请求。
+3. **统一取号协议**——对 SMS-Activate 系、GetSMS、SimSMS、JuicySMS 等，可用同一套 JSON 接口完成 `取号 → 轮询状态 → 取消`，无需为每家平台写不同调用方式。
 
 ### 网关端点
 
@@ -230,25 +231,17 @@ GET /api/gateway/v1/prices?provider=hero-sms&service=telegram&source=snapshot
 GET /api/gateway/v1/prices?provider=hero-sms&service=telegram&source=live
 GET /api/gateway/v1/balance?provider=hero-sms
 GET /api/gateway/v1/activate?provider=hero-sms&action=getBalance&api_key=...
+POST /api/gateway/v1/order?provider=hero-sms&service=telegram&country=12
+GET  /api/gateway/v1/order?provider=hero-sms&activationId=123&service=telegram&country=US
+POST /api/gateway/v1/order/cancel?provider=hero-sms&activationId=123&service=telegram&country=US
 ```
 
-- `meta`：列出 22 家平台的 **协议类型**（`activate-handler`、`priemnik`、`getsms-command` 等）与 **能力**（`balance`、`prices`、`get_number`…）。
+- `meta`：列出 22 家平台的 **协议类型**（`activate-handler`、`priemnik`、`getsms-command` 等）与 **能力**；`orderProtocols` 列出支持统一取号的平台。
 - `prices`：`source=snapshot` 读本地缓存（公开）；`source=live` 实时拉上游（需鉴权）。
 - `activate`：将 query 原样转发到对应平台 `handler_api.php`，响应与 SMS-Activate 一致（文本或 JSON）。
+- **统一订单**（需鉴权）：`orderState` 为 `pending | waiting_code | completed | cancelled | expired | rejected`。SMS-Activate 系 `country` 传平台国家 ID；SimSMS 传 ISO 国家码（如 `US`）；GetSMS 主要面向美国，可传 `state` / `areacode` / `markup`；JuicySMS 传 `US`/`GB` 等，可选 `serviceId`、`maxPrice`。
 
-### 鉴权方式（三选一）
-
-| 方式 | 用途 |
-| --- | --- |
-| 管理员登录 Cookie / Bearer | 面板同源调用 |
-| `GATEWAY_API_TOKEN`（请求头 `X-Gateway-Token` 或 `api_key` 参数） | 脚本/自动化，使用设置里已保存的上游 Key |
-| 直接传上游 `api_key` | 透传模式，不经本地存储 |
-
-```env
-GATEWAY_API_TOKEN=your-long-random-token
-```
-
-实现位置：`src/lib/gateway/`（`protocol-registry.js` 登记协议，`gateway-service.js` 统一出口，`activate-bridge.js` 做 SMS-Activate 中转）。
+实现位置：`src/lib/gateway/`（`protocol-registry.js` 登记协议，`gateway-service.js` 统一出口，`activate-bridge.js` SMS-Activate 中转，`order-bridge.js` 统一取号适配）。
 
 ## API
 

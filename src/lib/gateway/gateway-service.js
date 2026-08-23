@@ -12,6 +12,12 @@ const {
   supportsActivateProxy,
 } = require('./protocol-registry');
 const { proxyActivateHandler } = require('./activate-bridge');
+const {
+  createUnifiedOrder: createOrderBridge,
+  getUnifiedOrderStatus: getOrderStatusBridge,
+  cancelUnifiedOrder: cancelOrderBridge,
+  supportsUnifiedOrders,
+} = require('./order-bridge');
 
 const SCHEMA = 'smsbazaar.gateway.v1';
 
@@ -142,6 +148,24 @@ async function proxyActivate({ db, providerKey, query, auth }) {
   });
 }
 
+async function createUnifiedOrder(params) {
+  const { db, providerKey, auth, ...rest } = params;
+  const apiKey = resolveProviderApiKeyForGateway(db, providerKey, auth);
+  return createOrderBridge({ providerKey, apiKey, ...rest });
+}
+
+async function getUnifiedOrderStatus(params) {
+  const { db, providerKey, auth, ...rest } = params;
+  const apiKey = resolveProviderApiKeyForGateway(db, providerKey, auth);
+  return getOrderStatusBridge({ providerKey, apiKey, ...rest });
+}
+
+async function cancelUnifiedOrder(params) {
+  const { db, providerKey, auth, ...rest } = params;
+  const apiKey = resolveProviderApiKeyForGateway(db, providerKey, auth);
+  return cancelOrderBridge({ providerKey, apiKey, ...rest });
+}
+
 function getGatewayMeta() {
   return {
     schema: SCHEMA,
@@ -152,16 +176,23 @@ function getGatewayMeta() {
       balance: 'GET /api/gateway/v1/balance?provider=hero-sms',
       prices: 'GET /api/gateway/v1/prices?provider=hero-sms&service=telegram&source=snapshot|live',
       activate: 'GET /api/gateway/v1/activate?provider=hero-sms&action=getBalance&api_key=...',
+      orderCreate: 'POST /api/gateway/v1/order?provider=hero-sms&service=telegram&country=12',
+      orderStatus: 'GET /api/gateway/v1/order?provider=hero-sms&activationId=123',
+      orderCancel: 'POST /api/gateway/v1/order/cancel?provider=hero-sms&activationId=123',
     },
     auth: {
       public: ['GET /api/gateway/v1/meta', 'GET /api/gateway/v1/prices (snapshot only)'],
-      protected: ['balance', 'prices live', 'activate proxy'],
+      protected: ['balance', 'prices live', 'activate proxy', 'order create/status/cancel'],
       methods: [
         'Admin session cookie / Bearer',
         'GATEWAY_API_TOKEN via X-Gateway-Token or api_key query',
         'Passthrough upstream api_key on activate endpoint',
       ],
     },
+    orderStates: ['pending', 'waiting_code', 'completed', 'cancelled', 'expired', 'rejected'],
+    orderProtocols: listGatewayProviders()
+      .filter((provider) => supportsUnifiedOrders(provider.providerKey))
+      .map((provider) => provider.providerKey),
     providers: listGatewayProviders(),
   };
 }
@@ -171,5 +202,9 @@ module.exports = {
   getUnifiedBalance,
   getUnifiedPrices,
   proxyActivate,
+  createUnifiedOrder,
+  getUnifiedOrderStatus,
+  cancelUnifiedOrder,
+  supportsUnifiedOrders,
   SCHEMA,
 };

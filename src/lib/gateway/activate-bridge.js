@@ -15,6 +15,7 @@ const PASSTHROUGH_QUERY_KEYS = new Set([
   'activationType',
   'language',
   'maxPrice',
+  'providerIds',
 ]);
 
 function pickPassthroughParams(query = {}) {

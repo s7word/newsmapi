@@ -153,6 +153,7 @@ const ACTIVATE_ACTIONS = new Set([
   'getCountries',
   'getNumbersStatus',
   'getNumber',
+  'getNumberV2',
   'getStatus',
   'setStatus',
   'getRentNumber',
