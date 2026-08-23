@@ -4,7 +4,7 @@ import { createApp } from '../src/app';
 import { createDatabase, saveProviderSnapshot } from '../src/lib/db';
 import { setAdminPassword, upsertProviderKey } from '../src/lib/settings';
 import { listGatewayProviders, supportsActivateProxy } from '../src/lib/gateway/protocol-registry';
-import { supportsUnifiedOrders as orderCapable } from '../src/lib/gateway/order-bridge';
+import { supportsUnifiedOrders as orderCapable, PROVIDER_HANDLERS } from '../src/lib/gateway/order-handlers';
 
 describe('gateway protocol registry', () => {
   it('lists all integrated providers with protocol metadata', () => {
@@ -15,7 +15,10 @@ describe('gateway protocol registry', () => {
     expect(supportsActivateProxy('getsms')).toBe(false);
     expect(orderCapable('hero-sms')).toBe(true);
     expect(orderCapable('getsms')).toBe(true);
-    expect(orderCapable('smspool')).toBe(false);
+    expect(orderCapable('smspool')).toBe(true);
+    expect(orderCapable('nexsms')).toBe(true);
+    expect(orderCapable('5sim')).toBe(true);
+    expect(PROVIDER_HANDLERS['sms-bus']).toBeTruthy();
   });
 });
 
@@ -150,5 +153,44 @@ describe('gateway API', () => {
 
     expect(statusRes.status).toBe(200);
     expect(statusRes.body.orderState).toBe('waiting_code');
+  });
+
+  it('creates unified order via SMSPool handler (mocked)', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: async () => JSON.stringify({
+          success: 1,
+          order_id: 'POOL123',
+          number: '15551230000',
+          price: 0.25,
+        }),
+      });
+
+    const db = createDatabase(':memory:');
+    setAdminPassword(db, 'admin-pass');
+    upsertProviderKey(db, 'SMSPOOL_API_KEY', 'upstream-smspool-key');
+    const refreshController = {
+      getState() { return { isRunning: false }; },
+      triggerRefresh() { return { accepted: true }; },
+    };
+    const app = createApp({ db, refreshController });
+
+    const createRes = await request(app)
+      .post('/api/gateway/v1/order')
+      .query({ api_key: 'gateway-test-token' })
+      .send({
+        provider: 'smspool',
+        service: 'telegram',
+        country: 'US',
+        serviceId: '1',
+      });
+
+    expect(createRes.status).toBe(200);
+    expect(createRes.body.status).toBe('ok');
+    expect(createRes.body.activationId).toBe('POOL123');
+    expect(createRes.body.orderState).toBe('waiting_code');
   });
 });
