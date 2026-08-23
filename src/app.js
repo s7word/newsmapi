@@ -156,6 +156,7 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
           providerKey: mapping.providerKey,
           displayName: mapping.displayName,
           serviceCode: mapping.serviceCode,
+          supportsCurrentService: Boolean(mapping.serviceCode),
           configured: isProviderConfigured(mapping),
           status: state?.status || 'idle',
           lastAttemptedAt: state?.last_attempted_at || '',

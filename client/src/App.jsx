@@ -336,6 +336,11 @@ function ProviderSettingsCard({
           }>
             接口 {connectivity ? (connectivity.ok ? '联通' : '失败') : '未测试'}
           </span>
+          {!provider.supportsCurrentService ? (
+            <span className="provider-settings-badge provider-settings-badge--muted">
+              当前服务无映射
+            </span>
+          ) : null}
         </div>
       </header>
 
