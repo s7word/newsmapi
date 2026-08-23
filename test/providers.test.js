@@ -4,6 +4,8 @@ import { fetchProviderOffers as fetchNexSms } from '../src/lib/providers/nexsms'
 import { fetchProviderOffers as fetchSmsVerification } from '../src/lib/providers/sms-verification-number';
 import { fetchProviderOffers as fetchHero } from '../src/lib/providers/hero-sms';
 import { fetchProviderOffers as fetchGrizzly } from '../src/lib/providers/grizzlysms';
+import { fetchProviderOffers as fetchTiger } from '../src/lib/providers/tiger-sms';
+import { buildCountryLookup as buildTigerCountryLookup } from '../src/lib/providers/tiger-sms';
 import { fetchProviderOffers as fetchSmsPool } from '../src/lib/providers/smspool';
 import { extractCountriesForService } from '../src/lib/providers/smsbower';
 
@@ -24,6 +26,15 @@ function mockFetchSequence(responses) {
 }
 
 describe('provider adapters', () => {
+  it('parses tiger-sms country arrays from getCountries', () => {
+    const lookup = buildTigerCountryLookup([
+      { id: 12, eng: 'United States' },
+      { id: 1, eng: 'Ukraine' },
+    ]);
+    expect(lookup.get('12')).toBe('United States');
+    expect(lookup.get('1')).toBe('Ukraine');
+  });
+
   it('parses smsbower country sheet', () => {
     const countries = extractCountriesForService({
       services: {
@@ -166,6 +177,24 @@ describe('provider adapters', () => {
       apiKey: 'key',
     });
     expect(grizzlyResult.error).toBe('');
+
+    mockFetchSequence([
+      [{ id: 12, eng: 'United States' }],
+      { 12: { dr: { cost: '0.0390', count: 1000 } } },
+    ]);
+    const tigerResult = await fetchTiger({
+      mapping: {
+        providerKey: 'tiger-sms',
+        displayName: 'Tiger SMS',
+        serviceCode: 'dr',
+        baseUrl: 'https://api.tiger-sms.com/stubs/handler_api.php',
+      },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+    expect(tigerResult.error).toBe('');
+    expect(tigerResult.offers.length).toBeGreaterThan(0);
+    expect(tigerResult.offers[0].minPriceUsd).toBe(0.039);
 
     mockFetchSequence([
       [

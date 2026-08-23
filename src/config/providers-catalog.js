@@ -175,6 +175,14 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.GETSMS_REFRESH_INTERVAL_MS || 300000),
   },
+  {
+    providerKey: 'tiger-sms',
+    displayName: 'Tiger SMS',
+    baseUrl: 'https://api.tiger-sms.com/stubs/handler_api.php',
+    keyEnv: 'TIGER_SMS_API_KEY',
+    publicWithoutKey: false,
+    minRefreshIntervalMs: Number(process.env.TIGER_SMS_REFRESH_INTERVAL_MS || 180000),
+  },
 ];
 
 function listProviders() {

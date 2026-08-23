@@ -470,6 +470,7 @@ async function testProviderKey(providerKey, apiKey) {
     case 'grizzlysms':
     case 'sms-rooms':
     case '365sms':
+    case 'tiger-sms':
       result = await testActivateCompatible(definition.baseUrl, trimmedKey);
       break;
     case 'smsbower':

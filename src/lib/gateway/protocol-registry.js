@@ -144,6 +144,7 @@ const PROVIDER_PROTOCOL = {
   pvapins: 'pvapins-user-api',
   simsms: 'priemnik',
   getsms: 'getsms-command',
+  'tiger-sms': 'activate-handler',
 };
 
 const ACTIVATE_ACTIONS = new Set([
