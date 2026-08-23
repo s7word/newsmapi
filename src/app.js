@@ -33,8 +33,15 @@ const {
 const { listProviders } = require('./config/providers-catalog');
 const { testProviderKeySafe } = require('./lib/provider-key-test');
 const { buildProvidersPanel } = require('./lib/providers-panel');
+const {
+  getGatewayMeta,
+  getUnifiedBalance,
+  getUnifiedPrices,
+  proxyActivate,
+  requireGatewayAuth,
+} = require('./lib/gateway');
 
-function createApp({ db, refreshController, countrySyncController }) {
+function createApp({ db, refreshController, countrySyncController, exchangeRateService }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '64kb' }));
@@ -381,6 +388,155 @@ function createApp({ db, refreshController, countrySyncController }) {
       ? refreshController.triggerRefresh('manual', serviceKey)
       : await refreshController.refreshAll('manual', serviceKey);
     res.status(result.accepted ? 202 : 429).json(result);
+  });
+
+  app.get('/api/gateway/v1/meta', (req, res) => {
+    setApiCacheHeaders(res);
+    res.json(getGatewayMeta());
+  });
+
+  app.get('/api/gateway/v1/prices', async (req, res) => {
+    const providerKey = String(req.query.provider || '').trim();
+    if (!providerKey) {
+      res.status(400).json({
+        schema: 'smsbazaar.gateway.v1',
+        status: 'error',
+        code: 'bad_request',
+        message: '缺少 provider 参数',
+      });
+      return;
+    }
+
+    const source = String(req.query.source || 'snapshot').trim().toLowerCase();
+    const serviceKey = resolveServiceKey(req.query.service);
+
+    if (source === 'live') {
+      const auth = requireGatewayAuth(req, res, db);
+      if (!auth) return;
+      if (!exchangeRateService) {
+        res.status(503).json({
+          schema: 'smsbazaar.gateway.v1',
+          status: 'error',
+          code: 'exchange_rates_unavailable',
+          message: '汇率服务未就绪',
+        });
+        return;
+      }
+      try {
+        const payload = await getUnifiedPrices({
+          db,
+          exchangeRateService,
+          providerKey,
+          serviceKey,
+          source: 'live',
+          auth,
+        });
+        setNoStore(res);
+        res.json(payload);
+      } catch (error) {
+        res.status(400).json({
+          schema: 'smsbazaar.gateway.v1',
+          status: 'error',
+          code: 'prices_failed',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return;
+    }
+
+    setApiCacheHeaders(res);
+    try {
+      const payload = await getUnifiedPrices({
+        db,
+        exchangeRateService,
+        providerKey,
+        serviceKey,
+        source: 'snapshot',
+        auth: { mode: 'public' },
+      });
+      res.json(payload);
+    } catch (error) {
+      res.status(400).json({
+        schema: 'smsbazaar.gateway.v1',
+        status: 'error',
+        code: 'prices_failed',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.get('/api/gateway/v1/balance', async (req, res) => {
+    setNoStore(res);
+    const auth = requireGatewayAuth(req, res, db);
+    if (!auth) return;
+
+    const providerKey = String(req.query.provider || '').trim();
+    if (!providerKey) {
+      res.status(400).json({
+        schema: 'smsbazaar.gateway.v1',
+        status: 'error',
+        code: 'bad_request',
+        message: '缺少 provider 参数',
+      });
+      return;
+    }
+
+    try {
+      const payload = await getUnifiedBalance({ db, providerKey, auth });
+      res.status(payload.status === 'ok' ? 200 : 400).json(payload);
+    } catch (error) {
+      res.status(400).json({
+        schema: 'smsbazaar.gateway.v1',
+        status: 'error',
+        code: 'balance_failed',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.get('/api/gateway/v1/activate', async (req, res) => {
+    setNoStore(res);
+    const auth = requireGatewayAuth(req, res, db);
+    if (!auth) return;
+
+    const providerKey = String(req.query.provider || '').trim();
+    if (!providerKey) {
+      res.status(400).json({
+        status: 'error',
+        message: 'BAD_PROVIDER',
+      });
+      return;
+    }
+
+    try {
+      const result = await proxyActivate({
+        db,
+        providerKey,
+        query: req.query,
+        auth,
+      });
+      if (result.contentType === 'application/json') {
+        res.type('application/json').send(result.body);
+        return;
+      }
+      res.type('text/plain').send(result.body);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message === 'BAD_KEY') {
+        res.type('text/plain').send('BAD_KEY');
+        return;
+      }
+      if (message === 'BAD_ACTION') {
+        res.type('text/plain').send('BAD_ACTION');
+        return;
+      }
+      res.status(400).json({
+        schema: 'smsbazaar.gateway.v1',
+        status: 'error',
+        code: 'activate_proxy_failed',
+        message,
+      });
+    }
   });
 
   app.use('/api', (req, res) => {

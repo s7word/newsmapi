@@ -50,6 +50,7 @@ async function bootstrap() {
     db,
     refreshController,
     countrySyncController,
+    exchangeRateService,
   });
 
   const server = app.listen(port, host, () => {

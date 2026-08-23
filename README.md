@@ -215,6 +215,41 @@ PH 0
 npm run sync:countries
 ```
 
+## 统一协议网关（Gateway）
+
+各上游平台的鉴权方式、路径和返回格式差异很大。SMSBazaar 在适配层之上增加了 **统一网关**，对外提供两类能力：
+
+1. **标准化 JSON API**（`smsbazaar.gateway.v1`）——比价、余额、协议元数据使用同一响应结构。
+2. **SMS-Activate 协议中转**——对 Hero / Grizzly / SMS-Rooms / 365SMS / Vak SMS 等 `handler_api.php` 平台，可按 SMS-Activate 习惯转发 `getBalance`、`getPrices`、`getNumber` 等请求。
+
+### 网关端点
+
+```http
+GET /api/gateway/v1/meta
+GET /api/gateway/v1/prices?provider=hero-sms&service=telegram&source=snapshot
+GET /api/gateway/v1/prices?provider=hero-sms&service=telegram&source=live
+GET /api/gateway/v1/balance?provider=hero-sms
+GET /api/gateway/v1/activate?provider=hero-sms&action=getBalance&api_key=...
+```
+
+- `meta`：列出 22 家平台的 **协议类型**（`activate-handler`、`priemnik`、`getsms-command` 等）与 **能力**（`balance`、`prices`、`get_number`…）。
+- `prices`：`source=snapshot` 读本地缓存（公开）；`source=live` 实时拉上游（需鉴权）。
+- `activate`：将 query 原样转发到对应平台 `handler_api.php`，响应与 SMS-Activate 一致（文本或 JSON）。
+
+### 鉴权方式（三选一）
+
+| 方式 | 用途 |
+| --- | --- |
+| 管理员登录 Cookie / Bearer | 面板同源调用 |
+| `GATEWAY_API_TOKEN`（请求头 `X-Gateway-Token` 或 `api_key` 参数） | 脚本/自动化，使用设置里已保存的上游 Key |
+| 直接传上游 `api_key` | 透传模式，不经本地存储 |
+
+```env
+GATEWAY_API_TOKEN=your-long-random-token
+```
+
+实现位置：`src/lib/gateway/`（`protocol-registry.js` 登记协议，`gateway-service.js` 统一出口，`activate-bridge.js` 做 SMS-Activate 中转）。
+
 ## API
 
 ```http
@@ -229,6 +264,10 @@ PUT /api/settings/keys
 POST /api/settings/keys/test
 POST /api/settings/keys/test-all
 POST /api/refresh
+GET /api/gateway/v1/meta
+GET /api/gateway/v1/prices?provider=...&service=...&source=snapshot|live
+GET /api/gateway/v1/balance?provider=...
+GET /api/gateway/v1/activate?provider=...&action=getBalance&service=tg&country=0
 ```
 
 对比接口增加 `summary=1` 时仅返回国家摘要，`offers` 为空；省略该参数时返回完整平台与价格档位明细。前端首屏使用摘要模式，展开国家后再按需请求完整明细。
