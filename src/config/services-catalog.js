@@ -48,6 +48,7 @@ const EXTENDED_PROVIDER_CODES = {
     '365sms': 'tg',
     'juicy-sms': 'tg',
     'tiger-sms': 'tg',
+    smstg: 'tg',
     pvapins: 'tg',
     simsms: 'opt29',
     getsms: 'Telegram',

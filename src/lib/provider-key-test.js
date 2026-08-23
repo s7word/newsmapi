@@ -308,6 +308,24 @@ async function testSimsms(apiKey) {
   };
 }
 
+async function testSmstg(baseUrl, apiKey) {
+  const { getBalance } = require('./providers/smstg');
+  try {
+    const balance = await getBalance(apiKey, baseUrl);
+    return {
+      message: `连接成功 · 余额 ${balance} USD`,
+      details: { balance, currency: 'USD' },
+      endpoint: 'GET /api/getBalance',
+    };
+  } catch (error) {
+    const message = String(error?.message || '');
+    if (/BAD_KEY/i.test(message)) {
+      throw new Error('API Key 无效 (BAD_KEY)');
+    }
+    throw error;
+  }
+}
+
 async function testGetsms(apiKey) {
   const { resolveCredentials } = require('./providers/getsms');
   const credentials = resolveCredentials(apiKey);
@@ -526,6 +544,9 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'getsms':
       result = await testGetsms(trimmedKey);
+      break;
+    case 'smstg':
+      result = await testSmstg(definition.baseUrl, trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);

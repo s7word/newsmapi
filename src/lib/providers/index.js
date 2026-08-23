@@ -23,6 +23,7 @@ const pvapins = require('./pvapins');
 const simsms = require('./simsms');
 const getsms = require('./getsms');
 const tigerSms = require('./tiger-sms');
+const smstg = require('./smstg');
 
 const providers = {
   'hero-sms': heroSms,
@@ -48,6 +49,7 @@ const providers = {
   simsms,
   getsms,
   'tiger-sms': tigerSms,
+  smstg,
 };
 
 function getProvider(providerKey) {

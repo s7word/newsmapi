@@ -9,7 +9,7 @@ SMSBazaar 是一个用于对比多家短信接码平台、多种目标服务价�
 ## 功能特性
 
 - 多服务对比：OPENAI(ChatGPT)、Telegram、WhatsApp、Google、Discord、Microsoft、Twitter/X、Instagram、Facebook、TikTok、Amazon、Apple。
-- 已接入 23 家短信平台：Hero SMS、SMSBower、5sim、NexSMS、GrizzlySMS、Tiger SMS、SMS Verification Number、SMSPool、OnlineSim、SMSPVA、CodesVerify、SMSCode.net、SMS-Rooms、SMS-Bus、Vibe SMS、CyberYozh、Vak SMS、Give SMS、365SMS、JuicySMS、PVAPins、SimSMS、GetSMS。
+- 已接入 24 家短信平台：Hero SMS、SMSBower、5sim、NexSMS、GrizzlySMS、Tiger SMS、SMSTG、SMS Verification Number、SMSPool、OnlineSim、SMSPVA、CodesVerify、SMSCode.net、SMS-Rooms、SMS-Bus、Vibe SMS、CyberYozh、Vak SMS、Give SMS、365SMS、JuicySMS、PVAPins、SimSMS、GetSMS。
 - 前端「设置」面板：管理员登录后可写入/更新平台 API Key（存 SQLite，优先于环境变量）。
 - 国家统一使用 ISO2 做主键，解决各平台国家 ID 不一致的问题。
 - 国家名称显示为中文名，后面带英文名。
@@ -128,6 +128,7 @@ SMSBower / 5SIM 支持无 Key 拉取公开报价，便于本地先跑通看板�
 | NexSMS | https://nexsms.net |
 | Grizzly SMS | https://grizzlysms.com |
 | Tiger SMS | https://tiger-sms.com |
+| SMSTG | https://smstg.org |
 | SMS Verification Number | https://sms-verification-number.com |
 | SMSPool | https://www.smspool.net |
 | OnlineSim | https://onlinesim.io |
@@ -222,7 +223,7 @@ npm run sync:countries
 
 1. **标准化 JSON API**（`smsbazaar.gateway.v1`）——比价、余额、取号、查码、取消订单与协议元数据使用同一响应结构。
 2. **SMS-Activate 协议中转**——对 Hero / Grizzly / SMS-Rooms / 365SMS / Vak SMS 等 `handler_api.php` 平台，可按 SMS-Activate 习惯转发 `getBalance`、`getPrices`、`getNumber` 等请求。
-3. **统一取号协议**——全部 23 家接入平台均支持同一套 JSON 接口完成 `取号 → 轮询状态 → 取消`（SMS-Activate 系、GetSMS、SimSMS、JuicySMS、5SIM、NexSMS、SMSPool、OnlineSim、SMSPVA、SMSCode、CodesVerify、SMS-Bus、Vibe SMS、CyberYozh、Give SMS、PVAPins、Tiger SMS 等），无需为每家平台写不同调用方式。
+3. **统一取号协议**——全部 24 家接入平台均支持同一套 JSON 接口完成 `取号 → 轮询状态 → 取消`（SMS-Activate 系、GetSMS、SimSMS、JuicySMS、5SIM、NexSMS、SMSPool、OnlineSim、SMSPVA、SMSCode、CodesVerify、SMS-Bus、Vibe SMS、CyberYozh、Give SMS、PVAPins、Tiger SMS、SMSTG 等），无需为每家平台写不同调用方式。
 
 ### 网关端点
 
@@ -237,7 +238,7 @@ GET  /api/gateway/v1/order?provider=hero-sms&activationId=123&service=telegram&c
 POST /api/gateway/v1/order/cancel?provider=hero-sms&activationId=123&service=telegram&country=US
 ```
 
-- `meta`：列出 23 家平台的 **协议类型**（`activate-handler`、`priemnik`、`getsms-command` 等）与 **能力**；`orderProtocols` 列出支持统一取号的平台。
+- `meta`：列出 24 家平台的 **协议类型**（`activate-handler`、`smstg-account-api`、`priemnik`、`getsms-command` 等）与 **能力**；`orderProtocols` 列出支持统一取号的平台。
 - `prices`：`source=snapshot` 读本地缓存（公开）；`source=live` 实时拉上游（需鉴权）。
 - `activate`：将 query 原样转发到对应平台 `handler_api.php`，响应与 SMS-Activate 一致（文本或 JSON）。
 - **统一订单**（需鉴权）：`orderState` 为 `pending | waiting_code | completed | cancelled | expired | rejected`。各平台 `country` 含义不同：SMS-Activate 系传平台国家 ID；SimSMS 传 ISO（如 `US`）；GetSMS 主要美国，可传 `state` / `areacode` / `markup`；JuicySMS 传 `US`/`GB` 等；5SIM 传国家 slug（如 `usa`）；NexSMS 传 `countryId`；OnlineSim 传国际区号数字（如 `1`）；SMSPool 可传 `pool`、`serviceId`；SMS-Bus 可传 `countryId`、`projectId`；NexSMS / PVAPins / SMSCode 查码时 `activationId` 可为手机号，也可额外传 `phoneNumber`。

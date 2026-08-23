@@ -19,8 +19,11 @@ describe('gateway protocol registry', () => {
     expect(orderCapable('nexsms')).toBe(true);
     expect(orderCapable('5sim')).toBe(true);
     expect(orderCapable('tiger-sms')).toBe(true);
+    expect(orderCapable('smstg')).toBe(true);
     expect(supportsActivateProxy('tiger-sms')).toBe(true);
+    expect(supportsActivateProxy('smstg')).toBe(false);
     expect(PROVIDER_HANDLERS['sms-bus']).toBeTruthy();
+    expect(PROVIDER_HANDLERS.smstg).toBeTruthy();
   });
 });
 

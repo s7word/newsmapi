@@ -183,6 +183,14 @@ const PROVIDERS = [
     publicWithoutKey: false,
     minRefreshIntervalMs: Number(process.env.TIGER_SMS_REFRESH_INTERVAL_MS || 180000),
   },
+  {
+    providerKey: 'smstg',
+    displayName: 'SMSTG',
+    baseUrl: 'https://smstg.org/api',
+    keyEnv: 'SMSTG_API_KEY',
+    publicWithoutKey: true,
+    minRefreshIntervalMs: Number(process.env.SMSTG_REFRESH_INTERVAL_MS || 300000),
+  },
 ];
 
 function listProviders() {

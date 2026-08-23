@@ -119,6 +119,13 @@ const PROTOCOL_PROFILES = {
     priceCurrencyDefault: 'USD',
     transactional: true,
   },
+  'smstg-account-api': {
+    label: 'SMSTG Telegram account API',
+    capabilities: ['balance', 'prices', 'buy', 'get_otp'],
+    auth: { fields: ['api_key'], style: 'query_api_key' },
+    priceCurrencyDefault: 'USD',
+    transactional: true,
+  },
 };
 
 const PROVIDER_PROTOCOL = {
@@ -145,6 +152,7 @@ const PROVIDER_PROTOCOL = {
   simsms: 'priemnik',
   getsms: 'getsms-command',
   'tiger-sms': 'activate-handler',
+  smstg: 'smstg-account-api',
 };
 
 const ACTIVATE_ACTIONS = new Set([

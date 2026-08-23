@@ -7,6 +7,7 @@ const { proxyActivateHandler } = require('./activate-bridge');
 const { resolveCredentials } = require('../providers/getsms');
 const { normalizeBaseUrl: normalizeSmsPoolBaseUrl } = require('../providers/smspool');
 const countryBySlug = require('../providers/give-sms-countries.json');
+const { smstgApiRequest, resolveCountrySlug } = require('../providers/smstg');
 const {
   SCHEMA,
   errorPayload,
@@ -1572,6 +1573,133 @@ async function giveSmsCancelOrder({ providerKey, apiKey, activationId }) {
   });
 }
 
+function mapSmstgMessage(payload) {
+  return String(payload?.message || payload?.raw || '').trim();
+}
+
+function extractSmstgOrderId(payload) {
+  return String(
+    payload?.id
+    || payload?.order_id
+    || payload?.orderId
+    || payload?.data?.id
+    || payload?.data?.order_id
+    || payload?.data?.orderId
+    || '',
+  ).trim();
+}
+
+function extractSmstgPhone(payload) {
+  return String(
+    payload?.phone
+    || payload?.number
+    || payload?.account
+    || payload?.data?.phone
+    || payload?.data?.number
+    || payload?.data?.account
+    || '',
+  ).trim();
+}
+
+function extractSmstgOtp(payload) {
+  return String(
+    payload?.otp
+    || payload?.code
+    || payload?.data?.otp
+    || payload?.data?.code
+    || '',
+  ).trim();
+}
+
+function mapSmstgOrderState(payload, otp) {
+  const message = mapSmstgMessage(payload).toUpperCase();
+  if (otp) return 'completed';
+  if (/NO_OTP|WAIT|PROCESS|PENDING/i.test(message)) return 'waiting_code';
+  if (/NO_BALANCE/i.test(message)) return 'rejected';
+  if (/BAD_KEY/i.test(message)) return 'rejected';
+  if (message && !/^OK|SUCCESS/i.test(message)) return 'pending';
+  return 'waiting_code';
+}
+
+async function smstgCreateOrder({ providerKey, mapping, service, apiKey, country }) {
+  const baseUrl = mapping.baseUrl || 'https://smstg.org/api';
+  const countrySlug = resolveCountrySlug(country);
+  const payload = await smstgApiRequest(baseUrl, apiKey, 'buy', { country: countrySlug });
+
+  const message = mapSmstgMessage(payload);
+  if (message === 'BAD_KEY') {
+    return errorPayload(providerKey, 'bad_key', 'API Key 无效 (BAD_KEY)');
+  }
+  if (/NO_BALANCE/i.test(message)) {
+    return errorPayload(providerKey, 'no_balance', message || 'NO_BALANCE');
+  }
+  if (/NO_STOCK|OUT_OF_STOCK|NO_NUMBERS/i.test(message)) {
+    return errorPayload(providerKey, 'no_numbers', message || 'NO_STOCK');
+  }
+
+  const orderId = extractSmstgOrderId(payload);
+  if (!orderId && !extractSmstgPhone(payload)) {
+    return errorPayload(providerKey, 'order_failed', message || JSON.stringify(payload || {}));
+  }
+
+  const phone = extractSmstgPhone(payload);
+  const otp = extractSmstgOtp(payload);
+  const orderState = mapSmstgOrderState(payload, otp);
+
+  return okPayload(providerKey, {
+    activationId: orderId || phone,
+    phoneNumber: phone ? formatE164(phone) : '',
+    phoneNumberLocal: phone,
+    service,
+    serviceCode: mapping.serviceCode || 'tg',
+    country: countrySlug.toUpperCase(),
+    orderState,
+    cost: payload?.price != null
+      ? Number(payload.price)
+      : (payload?.data?.price != null ? Number(payload.data.price) : null),
+    currency: 'USD',
+    code: otp || null,
+    text: otp || null,
+    expiresInSec: 900,
+    raw: payload,
+  });
+}
+
+async function smstgOrderStatus({ providerKey, mapping, apiKey, activationId }) {
+  const baseUrl = mapping.baseUrl || 'https://smstg.org/api';
+  const payload = await smstgApiRequest(baseUrl, apiKey, 'getOtp', {
+    id: activationId,
+    order_id: activationId,
+  });
+
+  const message = mapSmstgMessage(payload);
+  if (message === 'BAD_KEY') {
+    return errorPayload(providerKey, 'bad_key', 'API Key 无效 (BAD_KEY)');
+  }
+  if (/NO_ORDER|NO_ACTIVATION|NOT_FOUND/i.test(message)) {
+    return errorPayload(providerKey, 'not_found', message || '订单不存在');
+  }
+
+  const otp = extractSmstgOtp(payload);
+  const orderState = mapSmstgOrderState(payload, otp);
+
+  return okPayload(providerKey, {
+    activationId: String(activationId),
+    orderState,
+    code: otp || null,
+    text: otp || null,
+    raw: payload,
+  });
+}
+
+async function smstgCancelOrder({ providerKey }) {
+  return errorPayload(
+    providerKey,
+    'cancel_not_supported',
+    'SMSTG 成品账号购买后不支持通过 API 取消',
+  );
+}
+
 const PROVIDER_HANDLERS = {
   '5sim': {
     create: fiveSimCreateOrder,
@@ -1632,6 +1760,11 @@ const PROVIDER_HANDLERS = {
     create: pvapinsCreateOrder,
     status: pvapinsOrderStatus,
     cancel: pvapinsCancelOrder,
+  },
+  smstg: {
+    create: smstgCreateOrder,
+    status: smstgOrderStatus,
+    cancel: smstgCancelOrder,
   },
 };
 
