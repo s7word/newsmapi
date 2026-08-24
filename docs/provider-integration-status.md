@@ -12,9 +12,9 @@
 | Grizzly SMS | `grizzlysms` | 正常 | activate `getPricesV3` | 有（201） | 有 | 有 | 有 |
 | SMS Verification Number | `sms-verification-number` | 正常 | `getServicesAndCost` | 有（211） | 有 | 有 | 有 |
 | SMSPool | `smspool` | 正常 | 服务价 + pool 库存 | 有（114） | 有（pool） | 有 | 有 |
-| OnlineSim | `onlinesim` | 已修复 | 连刷多个服务时目录请求会撞 `INTERVAL_CONCURRENT_REQUESTS_ERROR`（Twitter/Instagram 因此变 stale）。现默认顺序拉价、服务间冷却、目录短缓存。实机 Telegram **76** 国有价有库存。 | 有 | 有（`telegram` 等） | 有 | 有 |
+| OnlineSim | `onlinesim` | 已修复 | 连刷多个服务时目录请求会撞 `INTERVAL_CONCURRENT_REQUESTS_ERROR`（Twitter/Instagram 因此变 stale）。现默认顺序拉价、服务间冷却、目录短缓存。实机 Telegram **76** / Instagram **75** / Twitter **74** 国有价有库存。 | 有 | 有（`telegram` 等） | 有 | 有 |
 | SMSPVA | `smspva` | 正常 | activation 价目 | 有（68） | 有 | 有 | 有 |
-| CodesVerify | `codesverify` | 已修复 | `get_rates.php` USA 可用。Telegram / OpenAI / Instagram / Twitter 实机均有产品档。匹配已覆盖 `X / Twitter*`。**无库存字段**，有报价记 `stock=1`。库内 Instagram/Twitter 旧错「不支持批量报价」是修复前残留，重新刷新即可。 | 有（USA） | 有（app 名） | 有 | 仅「有货标记」 |
+| CodesVerify | `codesverify` | 已修复 | `get_rates.php` USA 可用。实机 Telegram 10 档、Instagram 8 档、Twitter 8 档（含 `X / Twitter*`）。**无库存字段**，有报价记 `stock=1`。库内 Instagram/Twitter 旧错「不支持批量报价」是修复前残留，重新刷新即可。 | 有（USA） | 有（app 名） | 有 | 仅「有货标记」 |
 | SMSCode.net | `smscode` | 无法对接 | Key **有效**（`get_balance` 正常，`get_number` 返回余额不足）。官方 `get_rates.php` 对 USA/UK/India 等均 **HTTP 500**；POST 返回 Customer Not Found；`get_countries` 可用但价目接口坏。首页只有营销卡片，无完整国家×产品价目可抓。不能编造报价。 | — | — | — | — |
 | SMS-Rooms | `sms-rooms` | 需配置 | 适配器已优先 `getPricesV3` 再回退 `getPrices`。实机 `getBalance` / `getPricesV3` / `getPrices` / `getCountries` 全部 **BAD_KEY**（Key 无效，不是端点错）。前台 `/services` 为 Nuxt 壳，无稳定公开价目；`/prices` 为 410。换有效 Key 即可。 | — | — | — | — |
 | SMS-Bus | `sms-bus` | 正常 | control 价目 | 有（29） | 有 | 有 | 有 |
