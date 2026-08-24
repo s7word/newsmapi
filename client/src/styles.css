@@ -241,7 +241,7 @@ select {
 
 .project-links {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
@@ -830,22 +830,45 @@ button.project-link {
 }
 
 .modal-card {
-  width: min(960px, 100%);
-  max-height: min(90vh, 960px);
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  width: min(960px, 94vw);
+  max-height: min(90vh, 900px);
   background: var(--surface-strong);
   color: var(--text);
   border: 1px solid var(--card-border);
   border-radius: 20px;
   box-shadow: var(--shadow);
-  padding: 20px;
+  overflow: hidden;
 }
 
 .modal-card__header {
+  flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  padding: 20px 24px 16px;
+}
+
+.modal-card__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 24px 20px;
+}
+
+.modal-card__footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-strong);
+}
+
+.modal-card__footer .ghost-button:last-child {
+  margin-left: auto;
 }
 
 .modal-card__header h2 {
@@ -1115,27 +1138,48 @@ button.project-link {
 }
 
 .settings-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   gap: 10px;
-  margin-bottom: 18px;
+  padding: 14px 0;
+  margin: 0 0 18px;
   flex-wrap: wrap;
+  background: var(--surface-strong);
+  border-bottom: 1px solid var(--line);
 }
 
 .settings-tabs__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border: 1px solid var(--line);
-  background: var(--surface-strong);
+  background: var(--table-bg);
   color: var(--text);
   border-radius: 999px;
-  padding: 8px 16px;
+  padding: 10px 20px;
   font: inherit;
+  font-size: 0.96rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.settings-tabs__button:hover {
+  transform: translateY(-1px);
+}
+
+.settings-tabs__button .settings-tabs__icon {
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
 .settings-tabs__button.is-active {
-  background: var(--accent-soft);
+  background: linear-gradient(135deg, #4252ff, #8a54ff);
   border-color: transparent;
-  color: var(--accent);
-  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(66, 82, 255, 0.28);
 }
 
 .telegram-push-settings {
@@ -1143,9 +1187,30 @@ button.project-link {
   gap: 16px;
 }
 
+.telegram-push-settings__title {
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.15rem;
+}
+
 .telegram-push-settings__intro p {
   margin: 0 0 10px;
   color: var(--muted);
+}
+
+.telegram-push-settings__howto {
+  margin: 0;
+  padding: 14px 16px 14px 32px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 0.88rem;
+  display: grid;
+  gap: 6px;
+}
+
+.telegram-push-settings__howto li strong {
+  color: var(--accent);
 }
 
 .telegram-push-settings__status {

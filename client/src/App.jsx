@@ -435,10 +435,16 @@ function TelegramPushSettings({
   return (
     <div className="telegram-push-settings">
       <div className="telegram-push-settings__intro">
+        <h3 className="telegram-push-settings__title">Telegram 补货/上新推送</h3>
         <p>
           管理补货 / 上新 Telegram 推送对象。Bot：
           <strong> @{telegramConfig?.botUsername || 'rscbot2026_bot'}</strong>
         </p>
+        <ol className="telegram-push-settings__howto">
+          <li>在 Telegram 中搜索并私聊机器人 <strong>@{telegramConfig?.botUsername || 'rscbot2026_bot'}</strong>，发送任意一条消息（例如 /start）。</li>
+          <li>机器人会自动识别你的 Chat ID，或者你也可以通过 @userinfobot 等第三方机器人查询自己的 Chat ID。</li>
+          <li>将 Chat ID 粘贴到下方表单中并点击「添加推送对象」，即可开始接收补货 / 上新告警。</li>
+        </ol>
         <div className="telegram-push-settings__status">
           <span className={telegramConfig?.alertsEnabled ? 'provider-settings-badge provider-settings-badge--ok' : 'provider-settings-badge provider-settings-badge--muted'}>
             {telegramConfig?.alertsEnabled ? '告警已启用' : '告警未启用'}
@@ -591,6 +597,25 @@ function SettingsModal({
     setTestingAll(false);
   }, [open, authenticated]);
 
+  async function handleTestAll() {
+    setTestingAll(true);
+    try {
+      const results = await onTestAllKeys(draftKeys);
+      const mapped = {};
+      for (const result of results) {
+        if (result.keyEnv) mapped[result.keyEnv] = result;
+      }
+      setTestResults(mapped);
+      await onReloadPanel();
+    } catch (error) {
+      setTestResults({
+        __all: { ok: false, message: error.message || '批量测试失败' },
+      });
+    } finally {
+      setTestingAll(false);
+    }
+  }
+
   if (!open) return null;
 
   return (
@@ -599,7 +624,7 @@ function SettingsModal({
         className="modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label="平台 API Key 设置"
+        aria-label="平台设置"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-card__header">
@@ -614,196 +639,179 @@ function SettingsModal({
         </div>
 
         {!authenticated ? (
-          <form
-            className="settings-login"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              setLoginError('');
-              const formPassword = String(new FormData(event.currentTarget).get('password') || password || '');
-              try {
-                await onLogin(formPassword);
-              } catch (error) {
-                setLoginError(error.message || '登录失败');
-              }
-            }}
-          >
-            <label>
-              管理员密码
-              <input
-                type="password"
-                name="password"
-                value={password}
-                autoComplete="current-password"
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="ADMIN_PASSWORD / ADMIN_REFRESH_TOKEN"
-              />
-            </label>
-            {loginError ? <div className="error-banner">{loginError}</div> : null}
-            <button type="submit" className="primary-button">登录</button>
-          </form>
+          <div className="modal-card__body">
+            <form
+              className="settings-login"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setLoginError('');
+                const formPassword = String(new FormData(event.currentTarget).get('password') || password || '');
+                try {
+                  await onLogin(formPassword);
+                } catch (error) {
+                  setLoginError(error.message || '登录失败');
+                }
+              }}
+            >
+              <label>
+                管理员密码
+                <input
+                  type="password"
+                  name="password"
+                  value={password}
+                  autoComplete="current-password"
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="ADMIN_PASSWORD / ADMIN_REFRESH_TOKEN"
+                />
+              </label>
+              {loginError ? <div className="error-banner">{loginError}</div> : null}
+              <button type="submit" className="primary-button">登录</button>
+            </form>
+          </div>
         ) : (
           <>
-            <div className="settings-tabs" role="tablist" aria-label="设置分类">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={settingsTab === 'providers'}
-                className={settingsTab === 'providers' ? 'settings-tabs__button is-active' : 'settings-tabs__button'}
-                onClick={() => onSettingsTabChange('providers')}
-              >
-                平台 API Key
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={settingsTab === 'telegram'}
-                className={settingsTab === 'telegram' ? 'settings-tabs__button is-active' : 'settings-tabs__button'}
-                onClick={() => onSettingsTabChange('telegram')}
-              >
-                推送 ID 管理
-              </button>
-            </div>
-
-            {settingsTab === 'telegram' ? (
-              <TelegramPushSettings
-                telegramConfig={telegramConfig}
-                loading={telegramLoading}
-                onReload={onReloadTelegram}
-                onAddRecipient={onAddTelegramRecipient}
-                onRemoveRecipient={onRemoveTelegramRecipient}
-                onToggleRecipient={onToggleTelegramRecipient}
-                onTestPush={onTestTelegramPush}
-                testingId={telegramTestingId}
-                pushMessage={telegramMessage}
-              />
-            ) : (
-          <form
-            className="settings-keys"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              await onSaveKeys(draftKeys);
-            }}
-          >
-            <div className="settings-panel-toolbar">
-              <button
-                type="button"
-                className="ghost-button"
-                disabled={panelLoading || testingAll || Boolean(testingKeyEnv) || saving}
-                onClick={async () => {
-                  setTestingAll(true);
-                  try {
-                    const results = await onTestAllKeys(draftKeys);
-                    const mapped = {};
-                    for (const result of results) {
-                      if (result.keyEnv) mapped[result.keyEnv] = result;
-                    }
-                    setTestResults(mapped);
-                    await onReloadPanel();
-                  } catch (error) {
-                    setTestResults({
-                      __all: { ok: false, message: error.message || '批量测试失败' },
-                    });
-                  } finally {
-                    setTestingAll(false);
-                  }
-                }}
-              >
-                {testingAll ? '检测中…' : '刷新接口状态'}
-              </button>
-              <button
-                type="button"
-                className="ghost-button"
-                disabled={panelLoading || testingAll || Boolean(testingKeyEnv) || saving}
-                onClick={() => onReloadPanel()}
-              >
-                {panelLoading ? '加载中…' : '刷新面板数据'}
-              </button>
-            </div>
-
-            {panelLoading && !providers?.length ? (
-              <div className="loading-card settings-panel-loading">正在加载平台状态…</div>
-            ) : null}
-
-            <div className="settings-keys__list settings-provider-grid">
-              {(providers || []).map((provider) => {
-                const testResult = testResults[provider.keyEnv];
-                const draftValue = draftKeys[provider.keyEnv] ?? '';
-                return (
-                  <ProviderSettingsCard
-                    key={provider.keyEnv}
-                    provider={provider}
-                    draftValue={draftValue}
-                    testResult={testResult}
-                    testing={testingKeyEnv === provider.keyEnv}
-                    onDraftChange={(value) => {
-                      setDraftKeys((current) => ({ ...current, [provider.keyEnv]: value }));
-                      setTestResults((current) => {
-                        const next = { ...current };
-                        delete next[provider.keyEnv];
-                        return next;
-                      });
-                    }}
-                    onTest={async () => {
-                      setTestingKeyEnv(provider.keyEnv);
-                      try {
-                        const result = await onTestKey(provider.keyEnv, draftValue);
-                        setTestResults((current) => ({ ...current, [provider.keyEnv]: result }));
-                        await onReloadPanel();
-                      } catch (error) {
-                        setTestResults((current) => ({
-                          ...current,
-                          [provider.keyEnv]: {
-                            ok: false,
-                            message: error.message || '测试失败',
-                          },
-                        }));
-                      } finally {
-                        setTestingKeyEnv('');
-                      }
-                    }}
-                  />
-                );
-              })}
-            </div>
-            {testResults.__all ? (
-              <div className={testResults.__all.ok ? 'success-banner' : 'error-banner'}>
-                {testResults.__all.message}
+            <div className="modal-card__body">
+              <div className="settings-tabs" role="tablist" aria-label="设置分类">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={settingsTab === 'providers'}
+                  className={settingsTab === 'providers' ? 'settings-tabs__button is-active' : 'settings-tabs__button'}
+                  onClick={() => onSettingsTabChange('providers')}
+                >
+                  <span className="settings-tabs__icon" aria-hidden="true">🔑</span>
+                  平台 Key
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={settingsTab === 'telegram'}
+                  className={settingsTab === 'telegram' ? 'settings-tabs__button is-active' : 'settings-tabs__button'}
+                  onClick={() => onSettingsTabChange('telegram')}
+                >
+                  <span className="settings-tabs__icon" aria-hidden="true">📣</span>
+                  Telegram 推送
+                </button>
               </div>
-            ) : null}
-            {message ? <div className="success-banner">{message}</div> : null}
-            <div className="settings-actions">
-              <button type="submit" className="primary-button" disabled={saving || testingAll}>
-                {saving ? '保存中...' : '保存 Key'}
-              </button>
-              <button
-                type="button"
-                className="ghost-button"
-                disabled={saving || testingAll || Boolean(testingKeyEnv)}
-                onClick={async () => {
-                  setTestingAll(true);
-                  try {
-                    const results = await onTestAllKeys(draftKeys);
-                    const mapped = {};
-                    for (const result of results) {
-                      if (result.keyEnv) mapped[result.keyEnv] = result;
-                    }
-                    setTestResults(mapped);
-                    await onReloadPanel();
-                  } catch (error) {
-                    setTestResults({
-                      __all: { ok: false, message: error.message || '批量测试失败' },
-                    });
-                  } finally {
-                    setTestingAll(false);
-                  }
-                }}
-              >
-                {testingAll ? '测试中…' : '测试全部'}
-              </button>
+
+              {settingsTab === 'telegram' ? (
+                <TelegramPushSettings
+                  telegramConfig={telegramConfig}
+                  loading={telegramLoading}
+                  onReload={onReloadTelegram}
+                  onAddRecipient={onAddTelegramRecipient}
+                  onRemoveRecipient={onRemoveTelegramRecipient}
+                  onToggleRecipient={onToggleTelegramRecipient}
+                  onTestPush={onTestTelegramPush}
+                  testingId={telegramTestingId}
+                  pushMessage={telegramMessage}
+                />
+              ) : (
+                <form
+                  id="provider-keys-form"
+                  className="settings-keys"
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    await onSaveKeys(draftKeys);
+                  }}
+                >
+                  <div className="settings-panel-toolbar">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      disabled={panelLoading || testingAll || Boolean(testingKeyEnv) || saving}
+                      onClick={handleTestAll}
+                    >
+                      {testingAll ? '检测中…' : '刷新接口状态'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      disabled={panelLoading || testingAll || Boolean(testingKeyEnv) || saving}
+                      onClick={() => onReloadPanel()}
+                    >
+                      {panelLoading ? '加载中…' : '刷新面板数据'}
+                    </button>
+                  </div>
+
+                  {panelLoading && !providers?.length ? (
+                    <div className="loading-card settings-panel-loading">正在加载平台状态…</div>
+                  ) : null}
+
+                  <div className="settings-keys__list settings-provider-grid">
+                    {(providers || []).map((provider) => {
+                      const testResult = testResults[provider.keyEnv];
+                      const draftValue = draftKeys[provider.keyEnv] ?? '';
+                      return (
+                        <ProviderSettingsCard
+                          key={provider.keyEnv}
+                          provider={provider}
+                          draftValue={draftValue}
+                          testResult={testResult}
+                          testing={testingKeyEnv === provider.keyEnv}
+                          onDraftChange={(value) => {
+                            setDraftKeys((current) => ({ ...current, [provider.keyEnv]: value }));
+                            setTestResults((current) => {
+                              const next = { ...current };
+                              delete next[provider.keyEnv];
+                              return next;
+                            });
+                          }}
+                          onTest={async () => {
+                            setTestingKeyEnv(provider.keyEnv);
+                            try {
+                              const result = await onTestKey(provider.keyEnv, draftValue);
+                              setTestResults((current) => ({ ...current, [provider.keyEnv]: result }));
+                              await onReloadPanel();
+                            } catch (error) {
+                              setTestResults((current) => ({
+                                ...current,
+                                [provider.keyEnv]: {
+                                  ok: false,
+                                  message: error.message || '测试失败',
+                                },
+                              }));
+                            } finally {
+                              setTestingKeyEnv('');
+                            }
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                  {testResults.__all ? (
+                    <div className={testResults.__all.ok ? 'success-banner' : 'error-banner'}>
+                      {testResults.__all.message}
+                    </div>
+                  ) : null}
+                  {message ? <div className="success-banner">{message}</div> : null}
+                </form>
+              )}
+            </div>
+
+            <div className="modal-card__footer">
+              {settingsTab === 'providers' ? (
+                <>
+                  <button
+                    type="submit"
+                    form="provider-keys-form"
+                    className="primary-button"
+                    disabled={saving || testingAll}
+                  >
+                    {saving ? '保存中...' : '保存 Key'}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    disabled={saving || testingAll || Boolean(testingKeyEnv)}
+                    onClick={handleTestAll}
+                  >
+                    {testingAll ? '测试中…' : '测试全部'}
+                  </button>
+                </>
+              ) : null}
               <button type="button" className="ghost-button" onClick={onLogout}>退出登录</button>
             </div>
-          </form>
-            )}
           </>
         )}
       </div>
@@ -846,6 +854,20 @@ function App() {
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [refreshingService, setRefreshingService] = useState(false);
   const [refreshNotice, setRefreshNotice] = useState('');
+
+  function openSettingsModal(tab = 'providers') {
+    setSettingsTab(tab);
+    setSettingsOpen(true);
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash.replace('#', '');
+    if (hash === 'telegram' || hash === 'push') {
+      setSettingsTab('telegram');
+      setSettingsOpen(true);
+    }
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -1351,7 +1373,7 @@ function App() {
         className="settings-toggle"
         title="平台 API Key 设置"
         aria-label="平台 API Key 设置"
-        onClick={() => setSettingsOpen(true)}
+        onClick={() => openSettingsModal('providers')}
       >
         设置
       </button>
@@ -1372,6 +1394,14 @@ function App() {
               {refreshingService ? '刷新中…' : '刷新当前服务'}
             </button>
           ) : null}
+          <button
+            type="button"
+            className="hero-refresh-button"
+            title="打开 Telegram 补货/上新推送设置"
+            onClick={() => openSettingsModal('telegram')}
+          >
+            📣 Telegram 推送
+          </button>
           <div className="hero-badge">
             <span>国家</span>
             <strong>{summary.countryCount}</strong>
@@ -1407,10 +1437,16 @@ function App() {
               <small>FoundZiGu/SMSBazaar</small>
             </span>
           </a>
-          <button type="button" className="project-link settings-inline" onClick={() => setSettingsOpen(true)}>
+          <button type="button" className="project-link settings-inline" onClick={() => openSettingsModal('providers')}>
             <span>
               <strong>平台设置</strong>
               <small>{authenticated ? '已登录 · 管理 API Key' : '登录后配置 API Key'}</small>
+            </span>
+          </button>
+          <button type="button" className="project-link settings-inline" onClick={() => openSettingsModal('telegram')}>
+            <span>
+              <strong>Telegram 推送</strong>
+              <small>{authenticated ? '管理补货 / 上新推送对象' : '登录后管理推送 ID'}</small>
             </span>
           </button>
         </div>
