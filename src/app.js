@@ -51,6 +51,7 @@ const {
 } = require('./lib/telegram-recipients');
 const { sendTelegramMessage, formatInventoryAlertLines } = require('./lib/telegram-notifier');
 const { isInventoryAlertEnabled } = require('./lib/inventory-alerts');
+const { resolveProviderAccountBalance } = require('./lib/provider-account-balance');
 const {
   getGatewayMeta,
   getUnifiedBalance,
@@ -502,12 +503,20 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
           continue;
         }
         const sampleProvider = resolveSampleProvider(recipient);
+        const includeSource = recipient.includeSource !== false;
+        const sampleDefinition = getProviderDefinition(sampleProvider?.providerKey) || {};
+        const accountBalance = includeSource
+          ? await resolveProviderAccountBalance(db, sampleProvider?.providerKey)
+          : null;
         const sampleText = formatInventoryAlertLines(sampleEvents, {
           serviceLabel: 'Telegram 接码',
           providerName: sampleProvider?.displayName || '',
           alertCode: sampleProvider?.alertCode || '',
-          includeSource: recipient.includeSource !== false,
-          portalUrl: resolvePortalUrl(getProviderDefinition(sampleProvider?.providerKey) || {}),
+          includeSource,
+          portalUrl: resolvePortalUrl(sampleDefinition.providerKey
+            ? sampleDefinition
+            : { ...sampleDefinition, providerKey: sampleProvider?.providerKey }),
+          accountBalance,
         });
         const chunkResults = await sendTelegramBroadcast({
           botToken: token,

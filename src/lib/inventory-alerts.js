@@ -14,6 +14,7 @@ const {
 const { getSetting, setSetting } = require('./settings');
 const { getProviderDefinition, resolvePortalUrl } = require('../config/providers-catalog');
 const { getProviderAlertCode } = require('../config/provider-alert-codes');
+const { resolveProviderAccountBalance } = require('./provider-account-balance');
 
 const ALERT_TYPE_LABELS = {
   new_listing: '新上架',
@@ -152,12 +153,14 @@ function createInventoryAlertService({ db }) {
     const alertCode = getProviderAlertCode(providerKey);
     const displayName = providerName || definition?.displayName || '';
     const pendingEvents = pending.map((row) => row.event);
+    const accountBalance = await resolveProviderAccountBalance(db, providerKey);
     const withSource = formatInventoryAlertLines(pendingEvents, {
       serviceLabel,
       providerName: displayName,
       alertCode,
       includeSource: true,
-      portalUrl: resolvePortalUrl(definition || {}),
+      portalUrl: resolvePortalUrl(definition || { providerKey }),
+      accountBalance,
     });
     const withoutSource = formatInventoryAlertLines(pendingEvents, {
       serviceLabel,

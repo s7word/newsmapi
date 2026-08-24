@@ -61,6 +61,27 @@ async function sendTelegramMessage({ botToken, chatId, text, parseMode = 'HTML' 
   return payload;
 }
 
+function formatConnectivityBalance(connectivity) {
+  if (!connectivity) return '—';
+  if (connectivity.balance != null && connectivity.balance !== '') {
+    const currency = connectivity.currency || 'USD';
+    return `${currency} ${connectivity.balance}`;
+  }
+  if (connectivity.countryCount != null) {
+    return `${connectivity.countryCount} 个国家`;
+  }
+  if (connectivity.mode === 'public') return '公开接口';
+  return connectivity.ok ? '已联通' : '—';
+}
+
+function formatAccountBalanceLine(accountBalance) {
+  const formatted = formatConnectivityBalance(accountBalance);
+  if (!accountBalance || formatted === '—') {
+    return '💰 账户余额：—（未测试）';
+  }
+  return `💰 账户余额：${escapeHtml(formatted)}`;
+}
+
 function formatInventoryAlertLines(events, options = {}) {
   const {
     serviceLabel = '接码',
@@ -68,6 +89,7 @@ function formatInventoryAlertLines(events, options = {}) {
     includeSource = true,
     alertCode = '',
     portalUrl = '',
+    accountBalance = null,
   } = options;
 
   const header = [];
@@ -77,9 +99,11 @@ function formatInventoryAlertLines(events, options = {}) {
     header.push(code
       ? `🔔 来源编号 <b>${code}</b> · ${name}`
       : `🔔 来源 · ${name}`);
+    header.push(formatAccountBalanceLine(accountBalance));
     const href = String(portalUrl || '').trim();
     if (href) {
       header.push(`🔗 <a href="${escapeHtmlAttribute(href)}">打开平台查看</a>`);
+      header.push(`🔗 平台链接：${escapeHtml(href)}`);
     }
     header.push(`📱 服务：${escapeHtml(serviceLabel)}`);
   }
@@ -105,6 +129,8 @@ function formatInventoryAlertLines(events, options = {}) {
 
 module.exports = {
   escapeHtml,
+  formatAccountBalanceLine,
+  formatConnectivityBalance,
   formatInventoryAlertLines,
   sendTelegramMessage,
   splitTelegramMessages,

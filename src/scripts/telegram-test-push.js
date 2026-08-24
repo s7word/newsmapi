@@ -10,6 +10,7 @@ const { sendTelegramMessage, formatInventoryAlertLines } = require('../lib/teleg
 const { sendTelegramBroadcast } = require('../lib/telegram-recipients');
 const { resolveProviderAlertMeta } = require('../config/provider-alert-codes');
 const { getProviderDefinition, resolvePortalUrl } = require('../config/providers-catalog');
+const { resolveProviderAccountBalance } = require('../lib/provider-account-balance');
 
 async function main() {
   const waitSeconds = Math.min(50, Math.max(0, Number(process.argv[2] || 0)));
@@ -56,7 +57,8 @@ async function main() {
     serviceLabel: 'Telegram 接码',
     ...resolveProviderAlertMeta('smstg'),
     includeSource: true,
-    portalUrl: resolvePortalUrl(getProviderDefinition('smstg') || {}),
+    portalUrl: resolvePortalUrl(getProviderDefinition('smstg') || { providerKey: 'smstg' }),
+    accountBalance: await resolveProviderAccountBalance(db, 'smstg'),
   });
 
   await sendTelegramBroadcast({

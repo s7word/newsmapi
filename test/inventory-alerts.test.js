@@ -192,10 +192,67 @@ describe('inventory-alerts', () => {
     expect(sourceMessage.text).toMatch(/P\d{2}/);
     expect(sourceMessage.text).toContain('SMSTG');
     expect(sourceMessage.text).toContain('<a href="https://smstg.org">打开平台查看</a>');
+    expect(sourceMessage.text).toContain('🔗 平台链接：https://smstg.org');
+    expect(sourceMessage.text).toContain('💰 账户余额：—（未测试）');
     expect(genericMessage.text).not.toContain('SMSTG');
     expect(genericMessage.text).not.toContain('来源编号');
     expect(genericMessage.text).not.toContain('打开平台查看');
     expect(genericMessage.text).not.toContain('https://smstg.org');
+    expect(genericMessage.text).not.toContain('账户余额');
+  });
+
+  it('includes cached connectivity balance for source-enabled recipients', async () => {
+    delete process.env.TELEGRAM_NOTIFY_CHAT_ID;
+    const { addTelegramRecipient, updateTelegramRecipient } = await import('../src/lib/telegram-recipients');
+    const { getSetting, setSetting, saveProviderConnectivity } = await import('../src/lib/settings');
+    const recipient = addTelegramRecipient(db, getSetting, setSetting, { chatId: '1184856337', label: '运营测试' });
+    updateTelegramRecipient(db, getSetting, setSetting, recipient.id, { includeSource: true });
+    saveProviderConnectivity(db, 'smstg', {
+      ok: true,
+      balance: '12.50',
+      currency: 'USD',
+      checkedAt: new Date().toISOString(),
+    });
+
+    const service = createInventoryAlertService({ db });
+    const result = await service.processProviderRefresh({
+      serviceKey: 'telegram',
+      providerKey: 'smstg',
+      providerName: 'SMSTG',
+      previousPayload: {
+        offers: [
+          baseOffer({
+            providerKey: 'smstg',
+            countryIso2: 'IN',
+            countryName: 'India',
+            inventoryTotal: 0,
+            status: 'out_of_stock',
+            tiers: [{ priceUsd: 0.2, priceOriginal: 0.2, stock: 0, providerRef: '' }],
+          }),
+        ],
+      },
+      newPayload: {
+        offers: [baseOffer({
+          providerKey: 'smstg',
+          countryIso2: 'IN',
+          countryName: 'India',
+          inventoryTotal: 4,
+        })],
+      },
+    });
+
+    expect(result.sent).toBe(true);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(body.chat_id).toBe('1184856337');
+    expect(body.text).toContain('来源编号');
+    expect(body.text).toContain('💰 账户余额：USD 12.50');
+    expect(body.text).toContain('<a href="https://smstg.org">打开平台查看</a>');
+    expect(body.text).toContain('🔗 平台链接：https://smstg.org');
+    expect(body.text).toContain('href=');
+    expect(body.text).toContain('https://');
+    expect(body.text).not.toContain('SMSTG_API_KEY');
+    expect(body.disable_web_page_preview).toBe(true);
   });
 
   it('skips non-configured services', async () => {

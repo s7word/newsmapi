@@ -31,6 +31,6 @@
 - **Chat ID 自动发现**：若未配置 `TELEGRAM_NOTIFY_CHAT_ID`，服务会每 30s 轮询 `getUpdates`；用户向 Bot（如 `rscbot2026_bot`）发一条私聊后，chat id 会写入 SQLite `app_settings.telegram_notify_chat_id` 并发送确认消息。
 - 云端 Agent 应自行：更新 `.env` 中的 Token、重启 Node（`8787`）、确认 `/api/meta` 平台数正确；无需用户手动重启。
 - 默认仅监听 `telegram` 服务快照 diff（新国家上架、库存 0→有货）。
-- 推送对象按人配置：`includeSource` 控制是否带内部来源编号（P01…），`providerKeys` 为 `null` 表示全部平台、数组为过滤名单。`includeSource=true` 时正文显示编号、展示名，以及 `resolvePortalUrl` 的可点击平台链接（`打开平台查看`）；`includeSource=false` 时三者都不带。不要带 `baseUrl` / `keyEnv` / `providerKey`。
+- 推送对象按人配置：`includeSource` 控制是否带内部来源编号（P01…），`providerKeys` 为 `null` 表示全部平台、数组为过滤名单。`includeSource=true` 时正文显示编号、展示名、账户余额（`provider_connectivity_tests` 缓存，缺/超过 24h 且有 Key 才现场测）、`打开平台查看` HTML 链接，以及明文 `🔗 平台链接：https://...` 兜底（部分 Telegram 客户端不易察觉纯 `<a>` 文案）。`includeSource=false` 时这些都不带。不要带 `baseUrl` / `keyEnv` / `providerKey`。
 - 启用后 Telegram 服务会每个刷新周期拉价（不再每 5 轮才刷一次）。
 - **勿将 Bot Token 提交到仓库**；已在聊天中泄露的 Token 建议在 @BotFather 重置。
