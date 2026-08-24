@@ -61,22 +61,19 @@ function formatInventoryAlertLines(events, options = {}) {
   const {
     serviceLabel = '接码',
     providerName = '',
-    providerKey = '',
-    portalUrl = '',
+    includeSource = true,
+    alertCode = '',
   } = options;
 
-  const platformTitle = escapeHtml(providerName || providerKey || '未知平台');
-  const platformKey = escapeHtml(providerKey || '—');
-  const portalLine = portalUrl
-    ? `\n🔗 <a href="${escapeHtml(portalUrl)}">打开 ${platformTitle} 平台</a>`
-    : '';
-
-  const header = [
-    `🏪 <b>平台：${platformTitle}</b>`,
-    `🆔 <code>${platformKey}</code>`,
-    `📱 服务：${escapeHtml(serviceLabel)}`,
-    portalLine,
-  ].filter(Boolean).join('\n');
+  const header = [];
+  if (includeSource) {
+    const code = escapeHtml(alertCode || '');
+    const name = escapeHtml(providerName || '未知平台');
+    header.push(code
+      ? `🔔 来源编号 <b>${code}</b> · ${name}`
+      : `🔔 来源 · ${name}`);
+    header.push(`📱 服务：${escapeHtml(serviceLabel)}`);
+  }
 
   const lines = events.map((event) => {
     const typeLabel = event.type === 'new_listing' ? '🆕 新上架' : '📦 补货';
@@ -94,7 +91,7 @@ function formatInventoryAlertLines(events, options = {}) {
     ].join('\n');
   });
 
-  return [header, '━━━━━━━━━━━━━━', ...lines].join('\n\n');
+  return [header.join('\n'), '━━━━━━━━━━━━━━', ...lines].filter(Boolean).join('\n\n');
 }
 
 module.exports = {

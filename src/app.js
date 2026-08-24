@@ -34,6 +34,7 @@ const {
   upsertProviderKey,
 } = require('./lib/settings');
 const { listProviders, getProviderDefinition, resolvePortalUrl } = require('./config/providers-catalog');
+const { listProviderAlertCatalog, resolveProviderAlertMeta } = require('./config/provider-alert-codes');
 const { testProviderKeySafe } = require('./lib/provider-key-test');
 const { buildProvidersPanel } = require('./lib/providers-panel');
 const {
@@ -340,6 +341,7 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       alertServiceKeys: String(process.env.TELEGRAM_ALERT_SERVICE_KEYS || 'telegram'),
       inventoryAlertLogCount,
       recipients,
+      providerCatalog: listProviderAlertCatalog(),
     });
   });
 
@@ -371,6 +373,8 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
         label: req.body?.label,
         enabled: req.body?.enabled,
         chatId: req.body?.chatId,
+        includeSource: req.body?.includeSource,
+        providerKeys: req.body?.providerKeys,
       });
       if (!recipient) {
         res.status(404).json({ ok: false, error: 'not_found' });
@@ -414,21 +418,19 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       return;
     }
 
-    let chatIds = resolveTelegramNotifyChatIds(db, getSetting, setSetting);
+    const allRecipients = listTelegramRecipients(db, getSetting, setSetting);
     let discovery = null;
     const targetRecipientId = String(req.body?.recipientId || '').trim();
+    let targetRecipients = targetRecipientId
+      ? allRecipients.filter((row) => row.id === targetRecipientId && row.enabled)
+      : allRecipients.filter((row) => row.enabled);
 
-    if (targetRecipientId) {
-      const recipient = listTelegramRecipients(db, getSetting, setSetting)
-        .find((row) => row.id === targetRecipientId && row.enabled);
-      if (!recipient) {
-        res.status(404).json({ ok: false, error: 'recipient_not_found' });
-        return;
-      }
-      chatIds = [recipient.chatId];
+    if (targetRecipientId && !targetRecipients.length) {
+      res.status(404).json({ ok: false, error: 'recipient_not_found' });
+      return;
     }
 
-    if (!chatIds.length) {
+    if (!targetRecipients.length) {
       const waitSeconds = Math.min(50, Math.max(0, Number(req.body?.waitSeconds || 0)));
       discovery = await discoverTelegramNotifyChatId({
         db,
@@ -437,10 +439,21 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
         botToken: token,
         longPollSeconds: waitSeconds,
       });
-      chatIds = resolveTelegramNotifyChatIds(db, getSetting, setSetting);
+      targetRecipients = listTelegramRecipients(db, getSetting, setSetting)
+        .filter((row) => row.enabled);
     }
 
-    if (!chatIds.length) {
+    if (!targetRecipients.length) {
+      const fallbackIds = resolveTelegramNotifyChatIds(db, getSetting, setSetting);
+      targetRecipients = fallbackIds.map((chatId) => ({
+        chatId,
+        enabled: true,
+        includeSource: true,
+        providerKeys: null,
+      }));
+    }
+
+    if (!targetRecipients.length) {
       res.status(400).json({
         ok: false,
         error: 'chat_id_missing',
@@ -450,11 +463,9 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       return;
     }
 
-    const sampleText = formatInventoryAlertLines([
+    const sampleEvents = [
       {
         type: 'new_listing',
-        providerKey: 'smstg',
-        providerName: 'SMSTG',
         countryIso2: 'IN',
         countryName: 'India',
         previousStock: 0,
@@ -464,8 +475,6 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       },
       {
         type: 'restock',
-        providerKey: 'smstg',
-        providerName: 'SMSTG',
         countryIso2: 'BR',
         countryName: 'Brazil',
         previousStock: 0,
@@ -473,22 +482,40 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
         minPriceUsd: 0.35,
         currency: 'USD',
       },
-    ], {
-      serviceLabel: 'Telegram 接码',
-      providerName: 'SMSTG',
-      providerKey: 'smstg',
-      portalUrl: 'https://smstg.org',
-    });
-
+    ];
+    const catalog = listProviderAlertCatalog();
     const testHeader = '🧪 <b>SMSBazaar 推送格式测试</b>\n\n以下为模拟告警样式：\n\n';
 
+    function resolveSampleProvider(recipient) {
+      if (Array.isArray(recipient.providerKeys) && recipient.providerKeys.length) {
+        return catalog.find((row) => recipient.providerKeys.includes(row.providerKey))
+          || resolveProviderAlertMeta(recipient.providerKeys[0]);
+      }
+      return catalog.find((row) => row.providerKey === 'smstg') || catalog[0];
+    }
+
     try {
-      const results = await sendTelegramBroadcast({
-        botToken: token,
-        chatIds,
-        text: `${testHeader}${sampleText}`,
-        sendTelegramMessage,
-      });
+      const results = [];
+      for (const recipient of targetRecipients) {
+        if (Array.isArray(recipient.providerKeys) && recipient.providerKeys.length === 0) {
+          results.push({ chatId: recipient.chatId, ok: false, error: 'no_providers_selected' });
+          continue;
+        }
+        const sampleProvider = resolveSampleProvider(recipient);
+        const sampleText = formatInventoryAlertLines(sampleEvents, {
+          serviceLabel: 'Telegram 接码',
+          providerName: sampleProvider?.displayName || '',
+          alertCode: sampleProvider?.alertCode || '',
+          includeSource: recipient.includeSource !== false,
+        });
+        const chunkResults = await sendTelegramBroadcast({
+          botToken: token,
+          chatIds: [recipient.chatId],
+          text: `${testHeader}${sampleText}`,
+          sendTelegramMessage,
+        });
+        results.push(...chunkResults);
+      }
       const failed = results.filter((row) => !row.ok);
       if (failed.length === results.length) {
         res.status(502).json({

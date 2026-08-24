@@ -7,11 +7,13 @@ const {
   splitTelegramMessages,
 } = require('./telegram-notifier');
 const {
+  listTelegramAlertRecipients,
   resolveTelegramNotifyChatIds,
   sendTelegramBroadcast,
 } = require('./telegram-recipients');
 const { getSetting, setSetting } = require('./settings');
-const { getProviderDefinition, resolvePortalUrl } = require('../config/providers-catalog');
+const { getProviderDefinition } = require('../config/providers-catalog');
+const { getProviderAlertCode } = require('../config/provider-alert-codes');
 
 const ALERT_TYPE_LABELS = {
   new_listing: '新上架',
@@ -106,8 +108,8 @@ function createInventoryAlertService({ db }) {
   const maxMessages = Number(process.env.TELEGRAM_ALERT_MAX_MESSAGES_PER_REFRESH || 20);
   const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
 
-  function getChatIds() {
-    return resolveTelegramNotifyChatIds(db, getSetting, setSetting);
+  function getRecipientsForProvider(providerKey) {
+    return listTelegramAlertRecipients(db, getSetting, setSetting, providerKey);
   }
 
   async function processProviderRefresh({
@@ -117,9 +119,13 @@ function createInventoryAlertService({ db }) {
     previousPayload,
     newPayload,
   }) {
-    const chatIds = getChatIds();
     if (!isInventoryAlertEnabled(db) || !serviceKeys.has(serviceKey)) {
       return { skipped: true, reason: 'disabled' };
+    }
+
+    const recipients = getRecipientsForProvider(providerKey);
+    if (!recipients.length) {
+      return { skipped: true, reason: 'no_recipients' };
     }
 
     const events = diffProviderOffers({
@@ -143,24 +149,40 @@ function createInventoryAlertService({ db }) {
 
     const serviceLabel = serviceKey === 'telegram' ? 'Telegram 接码' : serviceKey;
     const definition = getProviderDefinition(providerKey);
-    const portalUrl = resolvePortalUrl(definition || {});
-    const text = formatInventoryAlertLines(pending.map((row) => row.event), {
+    const alertCode = getProviderAlertCode(providerKey);
+    const displayName = providerName || definition?.displayName || '';
+    const pendingEvents = pending.map((row) => row.event);
+    const withSource = formatInventoryAlertLines(pendingEvents, {
       serviceLabel,
-      providerName: providerName || definition?.displayName || providerKey,
-      providerKey,
-      portalUrl,
+      providerName: displayName,
+      alertCode,
+      includeSource: true,
     });
-    const chunks = splitTelegramMessages(text);
-    const sentChunks = chunks.slice(0, maxMessages);
+    const withoutSource = formatInventoryAlertLines(pendingEvents, {
+      serviceLabel,
+      includeSource: false,
+    });
 
-    for (const chunk of sentChunks) {
-      await sendTelegramBroadcast({
-        botToken,
-        chatIds,
-        text: chunk,
-        sendTelegramMessage,
-      });
+    const sourceRecipients = recipients.filter((row) => row.includeSource !== false);
+    const genericRecipients = recipients.filter((row) => row.includeSource === false);
+    let messageCount = 0;
+
+    async function broadcastTo(targetRecipients, text) {
+      if (!targetRecipients.length) return;
+      const chunks = splitTelegramMessages(text).slice(0, maxMessages);
+      messageCount += chunks.length;
+      for (const chunk of chunks) {
+        await sendTelegramBroadcast({
+          botToken,
+          chatIds: targetRecipients.map((row) => row.chatId),
+          text: chunk,
+          sendTelegramMessage,
+        });
+      }
     }
+
+    await broadcastTo(sourceRecipients, withSource);
+    await broadcastTo(genericRecipients, withoutSource);
 
     for (const row of pending) {
       store.recordNotification(row.event, serviceKey, row.dedupeKey);
@@ -169,8 +191,8 @@ function createInventoryAlertService({ db }) {
     return {
       sent: true,
       eventCount: pending.length,
-      messageCount: sentChunks.length,
-      recipientCount: chatIds.length,
+      messageCount,
+      recipientCount: recipients.length,
       types: pending.map((row) => row.event.type),
     };
   }

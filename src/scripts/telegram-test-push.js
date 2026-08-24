@@ -8,6 +8,7 @@ const { getSetting, setSetting } = require('../lib/settings');
 const { discoverTelegramNotifyChatId, resolveTelegramNotifyChatIds } = require('../lib/telegram-chat-discovery');
 const { sendTelegramMessage, formatInventoryAlertLines } = require('../lib/telegram-notifier');
 const { sendTelegramBroadcast } = require('../lib/telegram-recipients');
+const { resolveProviderAlertMeta } = require('../config/provider-alert-codes');
 
 async function main() {
   const waitSeconds = Math.min(50, Math.max(0, Number(process.argv[2] || 0)));
@@ -52,9 +53,8 @@ async function main() {
     },
   ], {
     serviceLabel: 'Telegram 接码',
-    providerName: 'SMSTG',
-    providerKey: 'smstg',
-    portalUrl: 'https://smstg.org',
+    ...resolveProviderAlertMeta('smstg'),
+    includeSource: true,
   });
 
   await sendTelegramBroadcast({

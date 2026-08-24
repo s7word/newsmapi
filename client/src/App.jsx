@@ -311,37 +311,42 @@ function ProviderSettingsCard({
   const lastRefreshTime = refresh.lastSuccessAt || refresh.snapshotFetchedAt;
   const connectivityCheckedAt = connectivity?.checkedAt;
 
+  const metaText = [
+    provider.keyEnv,
+    KEY_SOURCE_LABELS[provider.source] || provider.source,
+    provider.maskedKey || '',
+  ].filter(Boolean).join(' · ');
+
   return (
     <article className="provider-settings-card">
       <header className="provider-settings-card__header">
-        <div>
+        <div className="provider-settings-card__title-row">
           <h3>{provider.displayName}</h3>
-          <p className="provider-settings-card__meta">
-            {provider.keyEnv}
-            {' · '}
-            {KEY_SOURCE_LABELS[provider.source] || provider.source}
-            {provider.maskedKey ? ` · ${provider.maskedKey}` : ''}
-          </p>
-        </div>
-        <div className="provider-settings-card__badges">
-          <span className={`provider-settings-badge provider-settings-badge--refresh-${refresh.status || 'idle'}`}>
-            报价 {REFRESH_STATUS_LABELS[refresh.status] || refresh.status || '未刷新'}
-          </span>
-          <span className={
-            connectivity
-              ? (connectivity.ok
-                ? 'provider-settings-badge provider-settings-badge--ok'
-                : 'provider-settings-badge provider-settings-badge--error')
-              : 'provider-settings-badge provider-settings-badge--muted'
-          }>
-            接口 {connectivity ? (connectivity.ok ? '联通' : '失败') : '未测试'}
-          </span>
-          {!provider.supportsCurrentService ? (
-            <span className="provider-settings-badge provider-settings-badge--muted">
-              当前服务无映射
+          <div className="provider-settings-card__badges">
+            <span className={`provider-settings-badge provider-settings-badge--refresh-${refresh.status || 'idle'}`}>
+              报价 {REFRESH_STATUS_LABELS[refresh.status] || refresh.status || '未刷新'}
             </span>
-          ) : null}
+            <span className={
+              connectivity
+                ? (connectivity.ok
+                  ? 'provider-settings-badge provider-settings-badge--ok'
+                  : 'provider-settings-badge provider-settings-badge--error')
+                : 'provider-settings-badge provider-settings-badge--muted'
+            }>
+              接口 {connectivity ? (connectivity.ok ? '联通' : '失败') : '未测试'}
+            </span>
+            {!provider.supportsCurrentService ? (
+              <span className="provider-settings-badge provider-settings-badge--muted">
+                当前服务无映射
+              </span>
+            ) : null}
+          </div>
         </div>
+        <p className="provider-settings-card__meta" title={metaText}>
+          <span className="provider-settings-card__key-env">{provider.keyEnv}</span>
+          <span>{` · ${KEY_SOURCE_LABELS[provider.source] || provider.source}`}</span>
+          {provider.maskedKey ? <span>{` · ${provider.maskedKey}`}</span> : null}
+        </p>
       </header>
 
       <div className="provider-settings-metrics">
@@ -424,13 +429,57 @@ function TelegramPushSettings({
   onAddRecipient,
   onRemoveRecipient,
   onToggleRecipient,
+  onUpdateRecipient,
   onTestPush,
   testingId,
   pushMessage,
 }) {
   const [chatId, setChatId] = useState('');
   const [label, setLabel] = useState('');
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [legendQuery, setLegendQuery] = useState('');
+  const [providerQueryById, setProviderQueryById] = useState({});
   const recipients = telegramConfig?.recipients || [];
+  const providerCatalog = telegramConfig?.providerCatalog || [];
+  const filteredLegend = providerCatalog.filter((row) => {
+    const query = legendQuery.trim().toLowerCase();
+    if (!query) return true;
+    return `${row.alertCode} ${row.displayName} ${row.providerKey}`.toLowerCase().includes(query);
+  });
+
+  function recipientProviderSummary(recipient) {
+    if (recipient.providerKeys == null) return '全部平台';
+    if (!recipient.providerKeys.length) return '未选择平台';
+    const labels = providerCatalog
+      .filter((row) => recipient.providerKeys.includes(row.providerKey))
+      .map((row) => `${row.alertCode} ${row.displayName}`);
+    return labels.length ? labels.join('、') : `${recipient.providerKeys.length} 个平台`;
+  }
+
+  function isProviderChecked(recipient, providerKey) {
+    if (recipient.providerKeys == null) return true;
+    return recipient.providerKeys.includes(providerKey);
+  }
+
+  async function handleToggleProvider(recipient, providerKey, checked) {
+    if (!onUpdateRecipient) return;
+    if (recipient.providerKeys == null) {
+      if (checked) return;
+      await onUpdateRecipient(recipient.id, {
+        providerKeys: providerCatalog
+          .map((row) => row.providerKey)
+          .filter((key) => key !== providerKey),
+      });
+      return;
+    }
+    const next = new Set(recipient.providerKeys);
+    if (checked) next.add(providerKey);
+    else next.delete(providerKey);
+    const selected = [...next];
+    await onUpdateRecipient(recipient.id, {
+      providerKeys: selected.length === providerCatalog.length ? null : selected,
+    });
+  }
 
   return (
     <div className="telegram-push-settings">
@@ -444,6 +493,7 @@ function TelegramPushSettings({
           <li>在 Telegram 中搜索并私聊机器人 <strong>@{telegramConfig?.botUsername || 'rscbot2026_bot'}</strong>，发送任意一条消息（例如 /start）。</li>
           <li>机器人会自动识别你的 Chat ID，或者你也可以通过 @userinfobot 等第三方机器人查询自己的 Chat ID。</li>
           <li>将 Chat ID 粘贴到下方表单中并点击「添加推送对象」，即可开始接收补货 / 上新告警。</li>
+          <li>可为每位推送对象单独选择平台，并决定是否带上来源编号（如 P07）。推送正文只显示内部编号，不会暴露 API 地址或 Key 名。</li>
         </ol>
         <div className="telegram-push-settings__status">
           <span className={telegramConfig?.alertsEnabled ? 'provider-settings-badge provider-settings-badge--ok' : 'provider-settings-badge provider-settings-badge--muted'}>
@@ -457,6 +507,30 @@ function TelegramPushSettings({
           </span>
         </div>
       </div>
+
+      <details
+        className="telegram-source-legend"
+        open={legendOpen}
+        onToggle={(event) => setLegendOpen(event.currentTarget.open)}
+      >
+        <summary>来源编号对照表</summary>
+        <p>告警里的 <strong>P01–P{String(providerCatalog.length).padStart(2, '0')}</strong> 对应下列平台，编号按目录顺序固定。</p>
+        <input
+          className="telegram-source-legend__search"
+          value={legendQuery}
+          onChange={(event) => setLegendQuery(event.target.value)}
+          placeholder="搜索编号或平台名"
+        />
+        <div className="telegram-source-legend__grid">
+          {filteredLegend.map((row) => (
+            <div key={row.providerKey} className="telegram-source-legend__item">
+              <code>{row.alertCode}</code>
+              <span>{row.displayName}</span>
+            </div>
+          ))}
+          {!filteredLegend.length ? <div className="telegram-recipient-empty">没有匹配的平台</div> : null}
+        </div>
+      </details>
 
       <form
         className="telegram-push-form"
@@ -510,40 +584,98 @@ function TelegramPushSettings({
         {!loading && !recipients.length ? (
           <div className="telegram-recipient-empty">暂无推送对象。添加 Chat ID 后即可接收告警。</div>
         ) : null}
-        {recipients.map((recipient) => (
-          <article key={recipient.id} className="telegram-recipient-card">
-            <div>
-              <h3>{recipient.label || '未命名'}</h3>
-              <p>{recipient.chatIdMasked || recipient.chatId}</p>
-            </div>
-            <div className="telegram-recipient-card__actions">
-              <label className="telegram-recipient-toggle">
-                <input
-                  type="checkbox"
-                  checked={recipient.enabled !== false}
-                  onChange={(event) => onToggleRecipient(recipient.id, event.target.checked)}
-                />
-                启用
-              </label>
-              <button
-                type="button"
-                className="ghost-button"
-                disabled={Boolean(testingId)}
-                onClick={() => onTestPush(recipient.id)}
-              >
-                {testingId === recipient.id ? '发送中…' : '测试'}
-              </button>
-              <button
-                type="button"
-                className="ghost-button telegram-recipient-card__delete"
-                disabled={Boolean(testingId)}
-                onClick={() => onRemoveRecipient(recipient.id)}
-              >
-                删除
-              </button>
-            </div>
-          </article>
-        ))}
+        {recipients.map((recipient) => {
+          const query = String(providerQueryById[recipient.id] || '').trim().toLowerCase();
+          const visibleProviders = providerCatalog.filter((row) => {
+            if (!query) return true;
+            return `${row.alertCode} ${row.displayName} ${row.providerKey}`.toLowerCase().includes(query);
+          });
+          return (
+            <article key={recipient.id} className="telegram-recipient-card">
+              <div className="telegram-recipient-card__top">
+                <div>
+                  <h3>{recipient.label || '未命名'}</h3>
+                  <p>{recipient.chatIdMasked || recipient.chatId}</p>
+                  <p className="telegram-recipient-card__summary">{recipientProviderSummary(recipient)}</p>
+                </div>
+                <div className="telegram-recipient-card__actions">
+                  <label className="telegram-recipient-toggle">
+                    <input
+                      type="checkbox"
+                      checked={recipient.enabled !== false}
+                      onChange={(event) => onToggleRecipient(recipient.id, event.target.checked)}
+                    />
+                    启用
+                  </label>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    disabled={Boolean(testingId)}
+                    onClick={() => onTestPush(recipient.id)}
+                  >
+                    {testingId === recipient.id ? '发送中…' : '测试'}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button telegram-recipient-card__delete"
+                    disabled={Boolean(testingId)}
+                    onClick={() => onRemoveRecipient(recipient.id)}
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
+
+              <div className="telegram-recipient-card__filters">
+                <label className="telegram-recipient-toggle">
+                  <input
+                    type="checkbox"
+                    checked={recipient.includeSource !== false}
+                    onChange={(event) => onUpdateRecipient?.(recipient.id, { includeSource: event.target.checked })}
+                  />
+                  推送来源编号
+                </label>
+                <label className="telegram-recipient-toggle">
+                  <input
+                    type="checkbox"
+                    checked={recipient.providerKeys == null}
+                    onChange={(event) => onUpdateRecipient?.(recipient.id, {
+                      providerKeys: event.target.checked ? null : [],
+                    })}
+                  />
+                  全部平台
+                </label>
+              </div>
+
+              <div className="telegram-recipient-providers">
+                <div className="telegram-recipient-providers__toolbar">
+                  <span>更新来源联系</span>
+                  <input
+                    value={providerQueryById[recipient.id] || ''}
+                    onChange={(event) => setProviderQueryById((current) => ({
+                      ...current,
+                      [recipient.id]: event.target.value,
+                    }))}
+                    placeholder="筛选平台"
+                  />
+                </div>
+                <div className="telegram-recipient-providers__list">
+                  {visibleProviders.map((row) => (
+                    <label key={row.providerKey} className="telegram-recipient-provider">
+                      <input
+                        type="checkbox"
+                        checked={isProviderChecked(recipient, row.providerKey)}
+                        onChange={(event) => handleToggleProvider(recipient, row.providerKey, event.target.checked)}
+                      />
+                      <code>{row.alertCode}</code>
+                      <span>{row.displayName}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </article>
+          );
+        })}
       </div>
 
       {pushMessage ? (
@@ -576,6 +708,7 @@ function SettingsModal({
   onAddTelegramRecipient,
   onRemoveTelegramRecipient,
   onToggleTelegramRecipient,
+  onUpdateTelegramRecipient,
   onTestTelegramPush,
   telegramTestingId,
   telegramMessage,
@@ -702,6 +835,7 @@ function SettingsModal({
                   onAddRecipient={onAddTelegramRecipient}
                   onRemoveRecipient={onRemoveTelegramRecipient}
                   onToggleRecipient={onToggleTelegramRecipient}
+                  onUpdateRecipient={onUpdateTelegramRecipient}
                   onTestPush={onTestTelegramPush}
                   testingId={telegramTestingId}
                   pushMessage={telegramMessage}
@@ -1280,11 +1414,15 @@ function App() {
   }
 
   async function handleToggleTelegramRecipient(id, enabled) {
+    return handleUpdateTelegramRecipient(id, { enabled });
+  }
+
+  async function handleUpdateTelegramRecipient(id, patch) {
     setTelegramMessage(null);
     const response = await fetch(`/api/settings/telegram/recipients/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled }),
+      body: JSON.stringify(patch),
     });
     if (!response.ok) throw new Error('更新失败');
     await loadTelegramSettings({ silent: true });
@@ -1672,6 +1810,7 @@ function App() {
         onAddTelegramRecipient={handleAddTelegramRecipient}
         onRemoveTelegramRecipient={handleRemoveTelegramRecipient}
         onToggleTelegramRecipient={handleToggleTelegramRecipient}
+        onUpdateTelegramRecipient={handleUpdateTelegramRecipient}
         onTestTelegramPush={handleTestTelegramPush}
         telegramTestingId={telegramTestingId}
         telegramMessage={telegramMessage}

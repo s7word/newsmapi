@@ -832,7 +832,7 @@ button.project-link {
 .modal-card {
   display: flex;
   flex-direction: column;
-  width: min(960px, 94vw);
+  width: min(1100px, 96vw);
   max-height: min(90vh, 900px);
   background: var(--surface-strong);
   color: var(--text);
@@ -1026,21 +1026,40 @@ button.project-link {
 
 .provider-settings-card__header {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.provider-settings-card__title-row {
+  display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 12px;
   align-items: flex-start;
+  gap: 8px 12px;
+  min-width: 0;
 }
 
 .provider-settings-card__header h3 {
   margin: 0;
   font-family: 'Space Grotesk', sans-serif;
   font-size: 1.05rem;
+  min-width: 0;
+  flex: 1 1 160px;
 }
 
 .provider-settings-card__meta {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--muted);
   font-size: 0.82rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-settings-card__key-env {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .provider-settings-card__badges {
@@ -1048,6 +1067,8 @@ button.project-link {
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .provider-settings-badge {
@@ -1096,7 +1117,7 @@ button.project-link {
 
 .provider-settings-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
 }
 
@@ -1254,15 +1275,100 @@ button.project-link {
   border-radius: 16px;
 }
 
-.telegram-recipient-card {
+.telegram-source-legend {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: var(--table-bg);
+}
+
+.telegram-source-legend summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.telegram-source-legend p {
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.telegram-source-legend__search,
+.telegram-recipient-providers__toolbar input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  color: var(--text);
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.telegram-source-legend__grid,
+.telegram-recipient-providers__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.telegram-source-legend__item,
+.telegram-recipient-provider {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
   align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.84rem;
+}
+
+.telegram-source-legend__item code,
+.telegram-recipient-provider code {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+.telegram-recipient-card {
+  display: grid;
+  gap: 12px;
   padding: 14px 16px;
   border-radius: 16px;
   border: 1px solid var(--provider-card-border);
   background: var(--provider-card-bg);
+}
+
+.telegram-recipient-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.telegram-recipient-card__summary,
+.telegram-recipient-card__filters {
+  color: var(--muted);
+}
+
+.telegram-recipient-card__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+}
+
+.telegram-recipient-providers {
+  display: grid;
+  gap: 8px;
+}
+
+.telegram-recipient-providers__toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 220px);
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.86rem;
+  color: var(--muted);
 }
 
 .telegram-recipient-card h3 {
@@ -1304,10 +1410,7 @@ button.project-link {
     grid-column: span 2;
   }
 
-  .provider-settings-card__header {
-    flex-direction: column;
-  }
-
+  .provider-settings-card__title-row,
   .provider-settings-card__badges {
     justify-content: flex-start;
   }
@@ -1316,7 +1419,9 @@ button.project-link {
     grid-template-columns: 1fr;
   }
 
-  .telegram-recipient-card {
+  .telegram-recipient-card__top,
+  .telegram-recipient-providers__toolbar {
+    grid-template-columns: 1fr;
     flex-direction: column;
     align-items: flex-start;
   }

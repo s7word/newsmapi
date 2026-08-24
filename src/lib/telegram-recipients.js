@@ -16,6 +16,12 @@ function maskChatId(chatId) {
   return `${value.slice(0, 2)}***${value.slice(-2)}`;
 }
 
+function normalizeProviderKeys(input) {
+  if (input == null) return null;
+  if (!Array.isArray(input)) return null;
+  return [...new Set(input.map((value) => String(value || '').trim()).filter(Boolean))];
+}
+
 function normalizeRecipient(input = {}) {
   const chatId = normalizeChatId(input.chatId);
   if (!chatId) return null;
@@ -25,7 +31,15 @@ function normalizeRecipient(input = {}) {
     label: String(input.label || '').trim(),
     enabled: input.enabled !== false,
     createdAt: String(input.createdAt || new Date().toISOString()),
+    includeSource: input.includeSource !== false,
+    providerKeys: normalizeProviderKeys(input.providerKeys),
   };
+}
+
+function recipientAcceptsProvider(recipient, providerKey) {
+  if (!recipient || recipient.enabled === false) return false;
+  if (recipient.providerKeys == null) return true;
+  return recipient.providerKeys.includes(String(providerKey || ''));
 }
 
 function readRecipientsRaw(db, getSetting) {
@@ -87,6 +101,32 @@ function resolveTelegramNotifyChatId(db, getSetting, setSetting) {
   return ids[0] || '';
 }
 
+function listTelegramAlertRecipients(db, getSetting, setSetting, providerKey = null) {
+  const recipients = listTelegramRecipients(db, getSetting, setSetting);
+  const knownChatIds = new Set(recipients.map((row) => row.chatId));
+  const envIds = String(process.env.TELEGRAM_NOTIFY_CHAT_ID || '')
+    .split(/[,;\s]+/)
+    .map((value) => normalizeChatId(value))
+    .filter(Boolean)
+    .filter((chatId) => !knownChatIds.has(chatId));
+
+  const combined = [
+    ...recipients,
+    ...envIds.map((chatId) => normalizeRecipient({
+      chatId,
+      label: '环境变量',
+      enabled: true,
+      includeSource: true,
+      providerKeys: null,
+    })),
+  ].filter(Boolean);
+
+  if (!providerKey) {
+    return combined.filter((row) => row.enabled);
+  }
+  return combined.filter((row) => recipientAcceptsProvider(row, providerKey));
+}
+
 function addTelegramRecipient(db, getSetting, setSetting, { chatId, label = '' }) {
   const normalized = normalizeRecipient({ chatId, label });
   if (!normalized) {
@@ -124,6 +164,12 @@ function updateTelegramRecipient(db, getSetting, setSetting, id, patch = {}) {
     if (!nextChatId) throw new Error('chat_id_required');
     recipients[index].chatId = nextChatId;
   }
+  if (patch.includeSource != null) {
+    recipients[index].includeSource = Boolean(patch.includeSource);
+  }
+  if (patch.providerKeys !== undefined) {
+    recipients[index].providerKeys = normalizeProviderKeys(patch.providerKeys);
+  }
 
   writeRecipients(db, setSetting, recipients);
   return {
@@ -160,9 +206,13 @@ module.exports = {
   TELEGRAM_RECIPIENTS_SETTING,
   LEGACY_CHAT_SETTING,
   addTelegramRecipient,
+  listTelegramAlertRecipients,
   listTelegramRecipients,
   maskChatId,
   migrateLegacyRecipients,
+  normalizeProviderKeys,
+  normalizeRecipient,
+  recipientAcceptsProvider,
   removeTelegramRecipient,
   resolveTelegramNotifyChatId,
   resolveTelegramNotifyChatIds,

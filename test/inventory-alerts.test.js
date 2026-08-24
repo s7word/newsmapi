@@ -107,6 +107,93 @@ describe('inventory-alerts', () => {
     expect(global.fetch).toHaveBeenCalled();
   });
 
+  it('routes alerts by recipient provider filter and includeSource', async () => {
+    delete process.env.TELEGRAM_NOTIFY_CHAT_ID;
+    const { addTelegramRecipient, updateTelegramRecipient } = await import('../src/lib/telegram-recipients');
+    const { getSetting, setSetting } = await import('../src/lib/settings');
+
+    const filtered = addTelegramRecipient(db, getSetting, setSetting, { chatId: '1001', label: 'A' });
+    const generic = addTelegramRecipient(db, getSetting, setSetting, { chatId: '1002', label: 'B' });
+    updateTelegramRecipient(db, getSetting, setSetting, filtered.id, {
+      includeSource: true,
+      providerKeys: ['smstg'],
+    });
+    updateTelegramRecipient(db, getSetting, setSetting, generic.id, {
+      includeSource: false,
+      providerKeys: null,
+    });
+
+    const service = createInventoryAlertService({ db });
+    const previousPayload = {
+      offers: [
+        baseOffer({
+          providerKey: 'hero-sms',
+          inventoryTotal: 0,
+          status: 'out_of_stock',
+          tiers: [{ priceUsd: 0.2, priceOriginal: 0.2, stock: 0, providerRef: '' }],
+        }),
+      ],
+    };
+    const newPayload = { offers: [baseOffer({ providerKey: 'hero-sms', inventoryTotal: 9 })] };
+
+    const heroResult = await service.processProviderRefresh({
+      serviceKey: 'telegram',
+      providerKey: 'hero-sms',
+      providerName: 'Hero SMS',
+      previousPayload,
+      newPayload,
+    });
+    expect(heroResult.sent).toBe(true);
+    expect(heroResult.recipientCount).toBe(1);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const heroBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(heroBody.chat_id).toBe('1002');
+    expect(heroBody.text).not.toContain('P01');
+    expect(heroBody.text).not.toContain('Hero SMS');
+    expect(heroBody.text).not.toContain('hero-sms');
+    expect(heroBody.text).toContain('Brazil (BR)');
+
+    const smstgPrevious = {
+      offers: [
+        baseOffer({
+          providerKey: 'smstg',
+          countryIso2: 'IN',
+          countryName: 'India',
+          inventoryTotal: 0,
+          status: 'out_of_stock',
+          tiers: [{ priceUsd: 0.2, priceOriginal: 0.2, stock: 0, providerRef: '' }],
+        }),
+      ],
+    };
+    const smstgResult = await service.processProviderRefresh({
+      serviceKey: 'telegram',
+      providerKey: 'smstg',
+      providerName: 'SMSTG',
+      previousPayload: smstgPrevious,
+      newPayload: {
+        offers: [baseOffer({
+          providerKey: 'smstg',
+          countryIso2: 'IN',
+          countryName: 'India',
+          inventoryTotal: 4,
+        })],
+      },
+    });
+    expect(smstgResult.sent).toBe(true);
+    expect(smstgResult.recipientCount).toBe(2);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+
+    const smstgBodies = global.fetch.mock.calls.slice(1).map(([, options]) => JSON.parse(options.body));
+    const sourceMessage = smstgBodies.find((row) => row.chat_id === '1001');
+    const genericMessage = smstgBodies.find((row) => row.chat_id === '1002');
+    expect(sourceMessage.text).toContain('来源编号');
+    expect(sourceMessage.text).toMatch(/P\d{2}/);
+    expect(sourceMessage.text).toContain('SMSTG');
+    expect(sourceMessage.text).not.toContain('smstg');
+    expect(genericMessage.text).not.toContain('SMSTG');
+    expect(genericMessage.text).not.toContain('来源编号');
+  });
+
   it('skips non-configured services', async () => {
     const service = createInventoryAlertService({ db });
     const result = await service.processProviderRefresh({

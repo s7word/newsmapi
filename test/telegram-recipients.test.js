@@ -3,9 +3,11 @@ import { createDatabase } from '../src/lib/db';
 import { getSetting, setSetting } from '../src/lib/settings';
 import {
   addTelegramRecipient,
+  listTelegramAlertRecipients,
   listTelegramRecipients,
   removeTelegramRecipient,
   resolveTelegramNotifyChatIds,
+  updateTelegramRecipient,
 } from '../src/lib/telegram-recipients';
 
 describe('telegram-recipients', () => {
@@ -23,6 +25,23 @@ describe('telegram-recipients', () => {
     const recipients = listTelegramRecipients(db, getSetting, setSetting);
     expect(recipients).toHaveLength(2);
     expect(recipients.some((row) => row.chatId === '222' && row.label === '同事')).toBe(true);
+    expect(recipients.every((row) => row.includeSource === true && row.providerKeys == null)).toBe(true);
+  });
+
+  it('updates includeSource and providerKeys filters', () => {
+    const db = createDatabase(':memory:');
+    const created = addTelegramRecipient(db, getSetting, setSetting, { chatId: '555', label: 'A' });
+    const updated = updateTelegramRecipient(db, getSetting, setSetting, created.id, {
+      includeSource: false,
+      providerKeys: ['smstg', '5sim'],
+    });
+    expect(updated.includeSource).toBe(false);
+    expect(updated.providerKeys).toEqual(['smstg', '5sim']);
+
+    const forSmstg = listTelegramAlertRecipients(db, getSetting, setSetting, 'smstg');
+    const forHero = listTelegramAlertRecipients(db, getSetting, setSetting, 'hero-sms');
+    expect(forSmstg.map((row) => row.chatId)).toEqual(['555']);
+    expect(forHero).toEqual([]);
   });
 
   it('removes recipient by id', () => {
