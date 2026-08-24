@@ -22,7 +22,19 @@ describe('App', () => {
             },
             display: { cnyRateFromUsd: 7.2, refreshIntervalMs: 60000 },
             providers: [
-              { providerKey: 'smsbower', displayName: 'SMSBower', status: 'success', configured: true },
+              {
+                providerKey: 'smsbower',
+                displayName: 'SMSBower',
+                status: 'success',
+                configured: true,
+                portalUrl: 'https://smsbower.app',
+                accountBalance: {
+                  ok: true,
+                  balance: '12.50',
+                  currency: 'USD',
+                  checkedAt: '2026-05-27T12:00:00.000Z',
+                },
+              },
             ],
             lastRefresh: { completed_at: '2026-05-27T12:00:00.000Z' },
             refreshState: 'idle',
@@ -86,6 +98,8 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /United States/i }));
     expect(await screen.findByRole('heading', { name: 'SMSBower' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /打开平台/i })).toHaveAttribute('href', 'https://smsbower.app');
+    expect(screen.getByText('USD 12.50')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('country=US'));
   });
 

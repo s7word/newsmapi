@@ -1025,6 +1025,25 @@ function App() {
     value: provider.providerKey,
     label: provider.displayName,
   })), [meta]);
+
+  const providerAccountLookup = useMemo(() => {
+    const map = new Map();
+    (meta?.providers || []).forEach((provider) => {
+      map.set(provider.providerKey, {
+        portalUrl: provider.portalUrl || '',
+        connectivity: provider.accountBalance || null,
+      });
+    });
+    panelProviders.forEach((provider) => {
+      const existing = map.get(provider.providerKey) || { portalUrl: '', connectivity: null };
+      map.set(provider.providerKey, {
+        portalUrl: provider.portalUrl || existing.portalUrl || '',
+        connectivity: provider.connectivity || existing.connectivity || null,
+      });
+    });
+    return map;
+  }, [meta, panelProviders]);
+
   const cnyRate = Number(meta?.display?.cnyRateFromUsd || 7.2);
   const serviceModes = meta?.service?.modes || ['all'];
 
@@ -1251,11 +1270,27 @@ function App() {
                     {offers.map((offer) => {
                       const tierKey = `${row.countryIso2}:${offer.providerKey}`;
                       const tiersOpen = Boolean(tierExpanded[tierKey]);
+                      const providerAccount = providerAccountLookup.get(offer.providerKey) || {};
+                      const portalUrl = providerAccount.portalUrl || '';
+                      const accountConnectivity = providerAccount.connectivity;
                       return (
                         <div key={`${row.countryIso2}-${offer.providerKey}`} className="provider-card">
                           <div className="provider-card__header">
                             <div>
-                              <h3>{offer.providerName}</h3>
+                              <div className="provider-card__title-row">
+                                <h3>{offer.providerName}</h3>
+                                {portalUrl ? (
+                                  <a
+                                    className="provider-card__portal-link"
+                                    href={portalUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title={`打开 ${offer.providerName} 官网`}
+                                  >
+                                    打开平台 ↗
+                                  </a>
+                                ) : null}
+                              </div>
                               <p>{offer.providerKey}</p>
                             </div>
                             <StatusPill status={offer.status} />
@@ -1269,6 +1304,15 @@ function App() {
                             <div>
                               <span>库存</span>
                               <strong>{offer.inventoryTotal}</strong>
+                            </div>
+                            <div>
+                              <span>账户余额</span>
+                              <strong>{formatConnectivityBalance(accountConnectivity)}</strong>
+                              {accountConnectivity?.checkedAt ? (
+                                <small>测试于 {formatTime(accountConnectivity.checkedAt)}</small>
+                              ) : (
+                                <small>在设置中测试连接后显示</small>
+                              )}
                             </div>
                             <div>
                               <span>更新时间</span>

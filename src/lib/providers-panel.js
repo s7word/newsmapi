@@ -1,6 +1,6 @@
 'use strict';
 
-const { getProviderDefinition } = require('../config/providers-catalog');
+const { getProviderDefinition, resolvePortalUrl } = require('../config/providers-catalog');
 const { buildServiceConfig } = require('../config/services-catalog');
 const { getAllProviderStates, getAllProviderSnapshots } = require('./db');
 const { getProviderConnectivityMap, listProviderKeySettings } = require('./settings');
@@ -27,6 +27,7 @@ function buildProvidersPanel(db, serviceKey) {
     return {
       ...provider,
       baseUrl: definition?.baseUrl || '',
+      portalUrl: resolvePortalUrl(definition || {}),
       publicWithoutKey: Boolean(definition?.publicWithoutKey || provider.publicWithoutKey),
       serviceCode: serviceCodeMap.get(provider.providerKey) || '',
       supportsCurrentService: Boolean(serviceCodeMap.get(provider.providerKey)),

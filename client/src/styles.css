@@ -539,6 +539,33 @@ button.project-link {
   font-size: 1.05rem;
 }
 
+.provider-card__title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.provider-card__portal-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--provider-card-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.provider-card__portal-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(66, 82, 255, 0.12);
+}
+
 .provider-card__header p {
   margin: 6px 0 0;
   color: var(--muted);

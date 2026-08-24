@@ -21,6 +21,7 @@ const {
   destroySession,
   extractBearerToken,
   getAdminPasswordRecord,
+  getProviderConnectivityMap,
   getSession,
   listProviderKeySettings,
   login,
@@ -30,7 +31,7 @@ const {
   setAdminPassword,
   upsertProviderKey,
 } = require('./lib/settings');
-const { listProviders } = require('./config/providers-catalog');
+const { listProviders, getProviderDefinition, resolvePortalUrl } = require('./config/providers-catalog');
 const { testProviderKeySafe } = require('./lib/provider-key-test');
 const { buildProvidersPanel } = require('./lib/providers-panel');
 const {
@@ -119,6 +120,7 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       whatsappCountryCount: rawCountryListSync.whatsappCountryCount || openAiWhatsAppCountries.whitelist.length,
       sources: rawCountryListSync.sources || {},
     };
+    const connectivityMap = getProviderConnectivityMap(db);
 
     const adminConfigured = Boolean(getAdminPasswordRecord(db));
 
@@ -152,6 +154,8 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       providers: serviceConfig.providerMappings.map((mapping) => {
         const state = states.get(mapping.providerKey);
         const snapshot = snapshots.get(mapping.providerKey);
+        const definition = getProviderDefinition(mapping.providerKey);
+        const connectivity = connectivityMap[mapping.providerKey] || null;
         return {
           providerKey: mapping.providerKey,
           displayName: mapping.displayName,
@@ -163,6 +167,16 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
           lastSuccessAt: state?.last_success_at || '',
           errorMessage: redactProviderError(state?.error_message),
           offerCount: snapshot?.payload?.offers?.length || 0,
+          portalUrl: resolvePortalUrl(definition || {}),
+          accountBalance: connectivity
+            ? {
+              ok: Boolean(connectivity.ok),
+              balance: connectivity.balance,
+              currency: connectivity.currency,
+              checkedAt: connectivity.checkedAt || '',
+              message: connectivity.message || '',
+            }
+            : null,
         };
       }),
       lastRefresh: latestRefresh,

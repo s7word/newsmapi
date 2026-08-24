@@ -3,6 +3,24 @@
 /**
  * Provider (platform) catalog. Service-specific product codes live in services-catalog.js.
  */
+const PORTAL_URL_OVERRIDES = {
+  smsbower: 'https://smsbower.app',
+};
+
+function resolvePortalUrl(provider = {}) {
+  if (provider.portalUrl) return String(provider.portalUrl).trim();
+  const override = PORTAL_URL_OVERRIDES[provider.providerKey];
+  if (override) return override;
+  const baseUrl = String(provider.baseUrl || '').trim();
+  if (!baseUrl) return '';
+  try {
+    const url = new URL(baseUrl);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return '';
+  }
+}
+
 const PROVIDERS = [
   {
     providerKey: 'hero-sms',
@@ -205,4 +223,5 @@ module.exports = {
   PROVIDERS,
   getProviderDefinition,
   listProviders,
+  resolvePortalUrl,
 };

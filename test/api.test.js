@@ -70,6 +70,9 @@ describe('API endpoints', () => {
     expect(meta.body.recommendationConfig.filePath).toBeUndefined();
     expect(meta.body.providers.some((provider) => provider.providerKey === 'sms-verification-number')).toBe(true);
     expect(meta.body.providers.some((provider) => provider.providerKey === 'sms-activate')).toBe(false);
+    const smsbowerMeta = meta.body.providers.find((provider) => provider.providerKey === 'smsbower');
+    expect(smsbowerMeta?.portalUrl).toBe('https://smsbower.app');
+    expect(smsbowerMeta?.accountBalance).toBeNull();
 
     const compare = await request(app).get('/api/compare?mode=register&sort=price_asc');
     expect(compare.status).toBe(200);
