@@ -23,17 +23,25 @@ const {
   getAdminPasswordRecord,
   getProviderConnectivityMap,
   getSession,
+  getSetting,
   listProviderKeySettings,
   login,
   requireAdmin,
   resolveProviderApiKey,
   saveProviderConnectivityFromTest,
   setAdminPassword,
+  setSetting,
   upsertProviderKey,
 } = require('./lib/settings');
 const { listProviders, getProviderDefinition, resolvePortalUrl } = require('./config/providers-catalog');
 const { testProviderKeySafe } = require('./lib/provider-key-test');
 const { buildProvidersPanel } = require('./lib/providers-panel');
+const {
+  discoverTelegramNotifyChatId,
+  resolveTelegramNotifyChatId,
+} = require('./lib/telegram-chat-discovery');
+const { sendTelegramMessage } = require('./lib/telegram-notifier');
+const { isInventoryAlertEnabled } = require('./lib/inventory-alerts');
 const {
   getGatewayMeta,
   getUnifiedBalance,
@@ -301,6 +309,89 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       providers: buildProvidersPanel(db, serviceKey),
       adminConfigured: Boolean(getAdminPasswordRecord(db)),
     });
+  });
+
+  app.get('/api/settings/telegram', requireAdmin(db), (req, res) => {
+    setNoStore(res);
+    const chatId = resolveTelegramNotifyChatId(db, getSetting);
+    const tokenConfigured = Boolean(String(process.env.TELEGRAM_BOT_TOKEN || '').trim());
+    let inventoryAlertLogCount = 0;
+    try {
+      inventoryAlertLogCount = db.prepare('SELECT COUNT(*) AS count FROM inventory_alert_log').get()?.count || 0;
+    } catch {
+      inventoryAlertLogCount = 0;
+    }
+    res.json({
+      alertsEnabled: isInventoryAlertEnabled(db),
+      tokenConfigured,
+      chatIdConfigured: Boolean(chatId),
+      chatIdMasked: chatId ? `${chatId.slice(0, 2)}***${chatId.slice(-2)}` : '',
+      botUsername: 'rscbot2026_bot',
+      alertServiceKeys: String(process.env.TELEGRAM_ALERT_SERVICE_KEYS || 'telegram'),
+      inventoryAlertLogCount,
+    });
+  });
+
+  app.put('/api/settings/telegram', requireAdmin(db), (req, res) => {
+    setNoStore(res);
+    const chatId = String(req.body?.chatId ?? '').trim();
+    if (!chatId) {
+      res.status(400).json({ ok: false, error: 'chat_id_required' });
+      return;
+    }
+    setSetting(db, 'telegram_notify_chat_id', chatId);
+    res.json({ ok: true, chatIdMasked: `${chatId.slice(0, 2)}***${chatId.slice(-2)}` });
+  });
+
+  app.post('/api/settings/telegram/test', requireAdmin(db), async (req, res) => {
+    setNoStore(res);
+    const token = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+    if (!token) {
+      res.status(400).json({ ok: false, error: 'bot_token_missing' });
+      return;
+    }
+
+    let chatId = resolveTelegramNotifyChatId(db, getSetting);
+    let discovery = null;
+    if (!chatId) {
+      const waitSeconds = Math.min(50, Math.max(0, Number(req.body?.waitSeconds || 0)));
+      discovery = await discoverTelegramNotifyChatId({
+        db,
+        getSetting,
+        setSetting,
+        botToken: token,
+        longPollSeconds: waitSeconds,
+      });
+      if (discovery.discovered && discovery.chatId) {
+        chatId = discovery.chatId;
+      }
+    }
+
+    if (!chatId) {
+      res.status(400).json({
+        ok: false,
+        error: 'chat_id_missing',
+        message: '尚未绑定 Telegram 聊天。请先向 @rscbot2026_bot 发送一条私聊消息，或在设置中填入 chat id。',
+        discovery,
+      });
+      return;
+    }
+
+    try {
+      await sendTelegramMessage({
+        botToken: token,
+        chatId,
+        text: [
+          '🧪 <b>SMSBazaar 测试推送</b>',
+          '',
+          '若你看到本条消息，说明 Bot Token 与 Chat ID 已正确配置，补货/上新告警可以正常送达。',
+          `时间：${new Date().toISOString()}`,
+        ].join('\n'),
+      });
+      res.json({ ok: true, sent: true, chatIdMasked: `${chatId.slice(0, 2)}***${chatId.slice(-2)}`, discovery });
+    } catch (error) {
+      res.status(502).json({ ok: false, error: 'send_failed', message: error.message });
+    }
   });
 
   app.put('/api/settings/keys', requireAdmin(db), (req, res) => {

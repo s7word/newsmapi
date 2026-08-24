@@ -10,7 +10,7 @@ const { createRefreshController } = require('./lib/refresh-controller');
 const { createOpenAiCountrySync } = require('./lib/openai-country-sync');
 const { createInventoryAlertService } = require('./lib/inventory-alerts');
 const { bootstrapAdminPassword, getSetting, setSetting } = require('./lib/settings');
-const { startTelegramChatDiscovery } = require('./lib/telegram-chat-discovery');
+const { startTelegramChatDiscovery, resolveTelegramNotifyChatId } = require('./lib/telegram-chat-discovery');
 const { sendTelegramMessage } = require('./lib/telegram-notifier');
 
 const port = Number(process.env.PORT || 8787);
@@ -34,6 +34,15 @@ async function bootstrap() {
   });
 
   const inventoryAlertService = createInventoryAlertService({ db });
+  const telegramChatId = resolveTelegramNotifyChatId(db, getSetting);
+  const telegramToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (telegramToken && telegramChatId) {
+    console.log(`Telegram inventory alerts: enabled (chat ${telegramChatId.slice(0, 2)}***${telegramChatId.slice(-2)})`);
+  } else if (telegramToken) {
+    console.log('Telegram inventory alerts: waiting for chat id — message @rscbot2026_bot to bind');
+  } else {
+    console.log('Telegram inventory alerts: disabled (TELEGRAM_BOT_TOKEN not set)');
+  }
 
   const telegramChatDiscovery = startTelegramChatDiscovery({
     db,

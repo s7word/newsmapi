@@ -15,17 +15,18 @@ function resolveTelegramNotifyChatId(db, getSetting) {
   return String(stored || '').trim();
 }
 
-async function fetchTelegramUpdates(botToken, offset = 0) {
+async function fetchTelegramUpdates(botToken, offset = 0, longPollSeconds = 0) {
   const token = String(botToken || '').trim();
   if (!token) return { ok: false, result: [] };
 
   const params = new URLSearchParams();
   if (offset > 0) params.set('offset', String(offset));
-  params.set('timeout', '0');
+  const timeout = Math.min(50, Math.max(0, Number(longPollSeconds || 0)));
+  params.set('timeout', String(timeout));
   params.set('allowed_updates', JSON.stringify(['message', 'channel_post', 'my_chat_member']));
 
   const url = `${TELEGRAM_API_ROOT}/bot${token}/getUpdates?${params.toString()}`;
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout((timeout + 15) * 1000) });
   const body = await response.text();
   let payload = {};
   try {
@@ -52,14 +53,20 @@ function pickChatIdFromUpdates(updates = []) {
   return best;
 }
 
-async function discoverTelegramNotifyChatId({ db, getSetting, setSetting, botToken = getTelegramBotToken() }) {
+async function discoverTelegramNotifyChatId({
+  db,
+  getSetting,
+  setSetting,
+  botToken = getTelegramBotToken(),
+  longPollSeconds = 0,
+}) {
   const token = String(botToken || '').trim();
   if (!token) return { discovered: false, reason: 'no_token' };
 
   const existing = resolveTelegramNotifyChatId(db, getSetting);
   if (existing) return { discovered: true, chatId: existing, source: 'configured' };
 
-  const payload = await fetchTelegramUpdates(token);
+  const payload = await fetchTelegramUpdates(token, 0, longPollSeconds);
   if (!payload?.ok) {
     return { discovered: false, reason: payload?.description || 'getUpdates_failed' };
   }
