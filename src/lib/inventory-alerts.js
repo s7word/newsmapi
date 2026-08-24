@@ -12,7 +12,7 @@ const {
   sendTelegramBroadcast,
 } = require('./telegram-recipients');
 const { getSetting, setSetting } = require('./settings');
-const { getProviderDefinition } = require('../config/providers-catalog');
+const { getProviderDefinition, resolvePortalUrl } = require('../config/providers-catalog');
 const { getProviderAlertCode } = require('../config/provider-alert-codes');
 
 const ALERT_TYPE_LABELS = {
@@ -157,6 +157,7 @@ function createInventoryAlertService({ db }) {
       providerName: displayName,
       alertCode,
       includeSource: true,
+      portalUrl: resolvePortalUrl(definition || {}),
     });
     const withoutSource = formatInventoryAlertLines(pendingEvents, {
       serviceLabel,

@@ -151,6 +151,8 @@ describe('inventory-alerts', () => {
     expect(heroBody.text).not.toContain('P01');
     expect(heroBody.text).not.toContain('Hero SMS');
     expect(heroBody.text).not.toContain('hero-sms');
+    expect(heroBody.text).not.toContain('打开平台查看');
+    expect(heroBody.text).not.toContain('https://hero-sms.com');
     expect(heroBody.text).toContain('Brazil (BR)');
 
     const smstgPrevious = {
@@ -189,9 +191,11 @@ describe('inventory-alerts', () => {
     expect(sourceMessage.text).toContain('来源编号');
     expect(sourceMessage.text).toMatch(/P\d{2}/);
     expect(sourceMessage.text).toContain('SMSTG');
-    expect(sourceMessage.text).not.toContain('smstg');
+    expect(sourceMessage.text).toContain('<a href="https://smstg.org">打开平台查看</a>');
     expect(genericMessage.text).not.toContain('SMSTG');
     expect(genericMessage.text).not.toContain('来源编号');
+    expect(genericMessage.text).not.toContain('打开平台查看');
+    expect(genericMessage.text).not.toContain('https://smstg.org');
   });
 
   it('skips non-configured services', async () => {

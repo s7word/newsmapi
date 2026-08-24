@@ -507,6 +507,7 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
           providerName: sampleProvider?.displayName || '',
           alertCode: sampleProvider?.alertCode || '',
           includeSource: recipient.includeSource !== false,
+          portalUrl: resolvePortalUrl(getProviderDefinition(sampleProvider?.providerKey) || {}),
         });
         const chunkResults = await sendTelegramBroadcast({
           botToken: token,

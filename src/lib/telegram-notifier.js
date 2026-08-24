@@ -9,6 +9,10 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;');
 }
 
+function escapeHtmlAttribute(value) {
+  return escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function splitTelegramMessages(text, maxLen = 4000) {
   const chunks = [];
   let remaining = String(text || '').trim();
@@ -63,6 +67,7 @@ function formatInventoryAlertLines(events, options = {}) {
     providerName = '',
     includeSource = true,
     alertCode = '',
+    portalUrl = '',
   } = options;
 
   const header = [];
@@ -72,6 +77,10 @@ function formatInventoryAlertLines(events, options = {}) {
     header.push(code
       ? `🔔 来源编号 <b>${code}</b> · ${name}`
       : `🔔 来源 · ${name}`);
+    const href = String(portalUrl || '').trim();
+    if (href) {
+      header.push(`🔗 <a href="${escapeHtmlAttribute(href)}">打开平台查看</a>`);
+    }
     header.push(`📱 服务：${escapeHtml(serviceLabel)}`);
   }
 
