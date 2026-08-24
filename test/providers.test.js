@@ -362,6 +362,10 @@ describe('provider adapters', () => {
 
   it('parses onlinesim per-country tariffs', async () => {
     process.env.ONLINESIM_RATES_DELAY_MS = '0';
+    process.env.ONLINESIM_SERVICE_COOLDOWN_MS = '0';
+    process.env.ONLINESIM_CATALOG_TTL_MS = '0';
+    const { fetchProviderOffers, resetOnlineSimRuntime } = await import('../src/lib/providers/onlinesim');
+    resetOnlineSimRuntime();
     mockFetchSequence([
       {
         response: '1',
@@ -377,7 +381,6 @@ describe('provider adapters', () => {
       },
     ]);
 
-    const { fetchProviderOffers } = await import('../src/lib/providers/onlinesim');
     const result = await fetchProviderOffers({
       mapping: { providerKey: 'onlinesim', displayName: 'OnlineSim', serviceCode: 'openai' },
       exchangeRateService,
@@ -389,6 +392,8 @@ describe('provider adapters', () => {
     expect(result.offers[0].tiers[0].priceOriginal).toBe(3.21);
     expect(result.offers[0].tiers[0].stock).toBe(42);
     delete process.env.ONLINESIM_RATES_DELAY_MS;
+    delete process.env.ONLINESIM_SERVICE_COOLDOWN_MS;
+    delete process.env.ONLINESIM_CATALOG_TTL_MS;
   });
 
   it('parses sms-bus country prices', async () => {
@@ -562,6 +567,13 @@ describe('provider adapters', () => {
       { app: 'OpenAI', rate: '0.54' },
     ], 'telegram');
     expect(tiers.map((tier) => tier.providerRef)).toEqual(['Telegram7', 'TelegramUS5']);
+    const twitterTiers = collectMatchingTiers([
+      { app: 'X / TwitterUS5', rate: '0.40' },
+      { app: 'Twitter6', rate: '0.15' },
+      { app: 'Xbox Live', rate: '0.99' },
+    ], 'twitter');
+    expect(twitterTiers.map((tier) => tier.providerRef)).toEqual(['Twitter6', 'X / TwitterUS5']);
+    expect(twitterTiers.every((tier) => tier.stock === 1)).toBe(true);
 
     const result = await fetchProviderOffers({
       mapping: { providerKey: 'codesverify', displayName: 'CodesVerify', serviceCode: 'telegram' },
@@ -577,6 +589,10 @@ describe('provider adapters', () => {
   it('retries OnlineSim catalog after INTERVAL_CONCURRENT_REQUESTS_ERROR', async () => {
     process.env.ONLINESIM_RATES_DELAY_MS = '0';
     process.env.ONLINESIM_RATES_RETRIES = '2';
+    process.env.ONLINESIM_SERVICE_COOLDOWN_MS = '0';
+    process.env.ONLINESIM_CATALOG_TTL_MS = '0';
+    const { fetchProviderOffers, resetOnlineSimRuntime } = await import('../src/lib/providers/onlinesim');
+    resetOnlineSimRuntime();
     mockFetchSequence([
       { response: 'INTERVAL_CONCURRENT_REQUESTS_ERROR' },
       {
@@ -586,7 +602,6 @@ describe('provider adapters', () => {
         services: { _telegram: { id: 7, count: 9, price: '1.25', slug: 'telegram' } },
       },
     ]);
-    const { fetchProviderOffers } = await import('../src/lib/providers/onlinesim');
     const result = await fetchProviderOffers({
       mapping: { providerKey: 'onlinesim', displayName: 'OnlineSim', serviceCode: 'telegram' },
       exchangeRateService,
@@ -597,6 +612,65 @@ describe('provider adapters', () => {
     expect(result.offers[0].tiers[0].stock).toBe(9);
     delete process.env.ONLINESIM_RATES_DELAY_MS;
     delete process.env.ONLINESIM_RATES_RETRIES;
+    delete process.env.ONLINESIM_SERVICE_COOLDOWN_MS;
+    delete process.env.ONLINESIM_CATALOG_TTL_MS;
+  });
+
+  it('defaults OnlineSim to sequential fetches and reuses catalog across services', async () => {
+    process.env.ONLINESIM_RATES_DELAY_MS = '0';
+    process.env.ONLINESIM_SERVICE_COOLDOWN_MS = '0';
+    process.env.ONLINESIM_CATALOG_TTL_MS = '60000';
+    delete process.env.ONLINESIM_RATES_SEQUENTIAL;
+    const {
+      fetchProviderOffers,
+      resetOnlineSimRuntime,
+      resolveConcurrency,
+    } = await import('../src/lib/providers/onlinesim');
+    resetOnlineSimRuntime();
+    expect(resolveConcurrency()).toBe(1);
+
+    mockFetchSequence([
+      {
+        response: '1',
+        country: 1,
+        countries: {
+          _1: { name: 'USA', original: 'usa', code: 1, enable: true },
+          _7: { name: 'Russia', original: 'rus', code: 7, enable: true },
+        },
+        services: {
+          _telegram: { id: 7, count: 9, price: '1.25', slug: 'telegram' },
+          _twitter: { id: 10, count: 2, price: '1.90', slug: 'twitter' },
+        },
+      },
+      {
+        response: '1',
+        services: { _telegram: { id: 7, count: 3, price: '0.80', slug: 'telegram' } },
+      },
+      {
+        response: '1',
+        services: { _twitter: { id: 10, count: 4, price: '2.10', slug: 'twitter' } },
+      },
+    ]);
+
+    const telegram = await fetchProviderOffers({
+      mapping: { providerKey: 'onlinesim', displayName: 'OnlineSim', serviceCode: 'telegram' },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+    const twitter = await fetchProviderOffers({
+      mapping: { providerKey: 'onlinesim', displayName: 'OnlineSim', serviceCode: 'twitter' },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+
+    expect(telegram.error).toBe('');
+    expect(twitter.error).toBe('');
+    expect(twitter.offers).toHaveLength(2);
+    expect(twitter.offers.map((offer) => offer.tiers[0].priceOriginal).sort()).toEqual([1.9, 2.1]);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+    delete process.env.ONLINESIM_RATES_DELAY_MS;
+    delete process.env.ONLINESIM_SERVICE_COOLDOWN_MS;
+    delete process.env.ONLINESIM_CATALOG_TTL_MS;
   });
 
   it('explains GetSMS missing user as configuration, not a public API', async () => {

@@ -14,7 +14,7 @@ const SERVICE_ALIASES = new Map([
   ['google', ['google', 'gmail']],
   ['discord', ['discord']],
   ['microsoft', ['microsoft', 'outlook']],
-  ['twitter', ['twitter']],
+  ['twitter', ['twitter', 'xtwitter']],
   ['instagram', ['instagram']],
   ['facebook', ['facebook']],
   ['tiktok', ['tiktok']],
@@ -58,7 +58,11 @@ function matchesService(appName, serviceCode, nativeName) {
   const app = normalizeAppName(appName);
   if (!app) return false;
   const targets = resolveTargets(serviceCode, nativeName);
-  return targets.some((target) => app === target || app.startsWith(target));
+  return targets.some((target) => {
+    if (!target) return false;
+    if (app === target || app.startsWith(target)) return true;
+    return target.length >= 4 && app.includes(target);
+  });
 }
 
 function parseRatesPayload(payload) {
