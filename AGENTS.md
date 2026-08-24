@@ -20,7 +20,9 @@
 
 ### Telegram 补货 / 上新通知
 
-- 环境变量：`TELEGRAM_BOT_TOKEN`、`TELEGRAM_NOTIFY_CHAT_ID`（先给 Bot 发一条消息，再用 `getUpdates` 或 @userinfobot 获取 chat id）。
+- 环境变量：`TELEGRAM_BOT_TOKEN`（写入 `/workspace/.env`，**勿提交**）；`TELEGRAM_NOTIFY_CHAT_ID` 可选。
+- **Chat ID 自动发现**：若未配置 `TELEGRAM_NOTIFY_CHAT_ID`，服务会每 30s 轮询 `getUpdates`；用户向 Bot（如 `rscbot2026_bot`）发一条私聊后，chat id 会写入 SQLite `app_settings.telegram_notify_chat_id` 并发送确认消息。
+- 云端 Agent 应自行：更新 `.env` 中的 Token、重启 Node（`8787`）、确认 `/api/meta` 平台数正确；无需用户手动重启。
 - 默认仅监听 `telegram` 服务快照 diff（新国家上架、库存 0→有货）。
 - 启用后 Telegram 服务会每个刷新周期拉价（不再每 5 轮才刷一次）。
 - **勿将 Bot Token 提交到仓库**；已在聊天中泄露的 Token 建议在 @BotFather 重置。

@@ -113,7 +113,18 @@ VIBE_SMS_API_KEY=
 CYBERYOZH_API_KEY=
 VAK_SMS_API_KEY=
 GIVE_SMS_API_KEY=
+SMSTG_API_KEY=
+TIGER_SMS_API_KEY=
+
+# Telegram 补货/上新 Bot 通知（默认仅 telegram 服务）
+TELEGRAM_ALERT_ENABLED=true
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_NOTIFY_CHAT_ID=
+TELEGRAM_ALERT_SERVICE_KEYS=telegram
+TELEGRAM_ALERT_RESTOCK_COOLDOWN_MS=21600000
 ```
+
+**Telegram 通知**：对比 `telegram` 服务每次刷新前后的快照，向 Bot 推送「新国家上架」或「库存 0→有货」。先给 Bot 发一条私聊消息，再打开 `https://api.telegram.org/bot<你的TOKEN>/getUpdates` 查看 `message.chat.id` 填入 `TELEGRAM_NOTIFY_CHAT_ID`。**勿将 Bot Token 写入 Git**；若 Token 曾在聊天中泄露，请在 @BotFather 重置。
 
 也可以在启动后打开前端右上角「设置」，用 `ADMIN_PASSWORD`（或兼容的 `ADMIN_REFRESH_TOKEN`）登录，把 Key 写入 SQLite。数据库中的 Key 优先于环境变量。
 

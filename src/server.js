@@ -9,6 +9,9 @@ const { createExchangeRateService } = require('./lib/exchange-rates');
 const { createRefreshController } = require('./lib/refresh-controller');
 const { createOpenAiCountrySync } = require('./lib/openai-country-sync');
 const { createInventoryAlertService } = require('./lib/inventory-alerts');
+const { bootstrapAdminPassword, getSetting, setSetting } = require('./lib/settings');
+const { startTelegramChatDiscovery } = require('./lib/telegram-chat-discovery');
+const { sendTelegramMessage } = require('./lib/telegram-notifier');
 
 const port = Number(process.env.PORT || 8787);
 const host = String(process.env.HOST || '0.0.0.0').trim() || '0.0.0.0';
@@ -31,6 +34,13 @@ async function bootstrap() {
   });
 
   const inventoryAlertService = createInventoryAlertService({ db });
+
+  const telegramChatDiscovery = startTelegramChatDiscovery({
+    db,
+    getSetting,
+    setSetting,
+    sendTelegramMessage,
+  });
 
   const refreshController = createRefreshController({
     db,
@@ -73,6 +83,7 @@ async function bootstrap() {
 
   const shutdown = () => {
     clearInterval(interval);
+    telegramChatDiscovery.stop();
     countrySyncController.stop();
     server.close(() => process.exit(0));
   };

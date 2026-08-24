@@ -227,6 +227,7 @@ module.exports = {
   getAdminPasswordRecord,
   getProviderConnectivityMap,
   getSession,
+  getSetting,
   listProviderKeySettings,
   login,
   requireAdmin,
@@ -234,5 +235,6 @@ module.exports = {
   saveProviderConnectivity,
   saveProviderConnectivityFromTest,
   setAdminPassword,
+  setSetting,
   upsertProviderKey,
 };

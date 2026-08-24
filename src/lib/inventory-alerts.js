@@ -6,6 +6,8 @@ const {
   sendTelegramMessage,
   splitTelegramMessages,
 } = require('./telegram-notifier');
+const { resolveTelegramNotifyChatId } = require('./telegram-chat-discovery');
+const { getSetting } = require('./settings');
 
 const ALERT_TYPE_LABELS = {
   new_listing: '新上架',
@@ -20,15 +22,15 @@ function parseServiceKeys(raw) {
   return new Set(values);
 }
 
-function isInventoryAlertEnabled() {
+function isInventoryAlertEnabled(db = null) {
   const enabled = String(process.env.TELEGRAM_ALERT_ENABLED || 'true').toLowerCase() !== 'false';
   const token = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
-  const chatId = String(process.env.TELEGRAM_NOTIFY_CHAT_ID || '').trim();
+  const chatId = resolveTelegramNotifyChatId(db, getSetting);
   return enabled && Boolean(token && chatId);
 }
 
-function shouldRefreshServiceEveryCycle(serviceKey) {
-  if (!isInventoryAlertEnabled()) return false;
+function shouldRefreshServiceEveryCycle(serviceKey, db = null) {
+  if (!isInventoryAlertEnabled(db)) return false;
   return parseServiceKeys(process.env.TELEGRAM_ALERT_SERVICE_KEYS).has(serviceKey);
 }
 
@@ -97,7 +99,10 @@ function createInventoryAlertService({ db }) {
   const restockCooldownMs = Number(process.env.TELEGRAM_ALERT_RESTOCK_COOLDOWN_MS || 21600000);
   const maxMessages = Number(process.env.TELEGRAM_ALERT_MAX_MESSAGES_PER_REFRESH || 20);
   const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
-  const chatId = String(process.env.TELEGRAM_NOTIFY_CHAT_ID || '').trim();
+
+  function getChatId() {
+    return resolveTelegramNotifyChatId(db, getSetting);
+  }
 
   async function processProviderRefresh({
     serviceKey,
@@ -106,7 +111,8 @@ function createInventoryAlertService({ db }) {
     previousPayload,
     newPayload,
   }) {
-    if (!isInventoryAlertEnabled() || !serviceKeys.has(serviceKey)) {
+    const chatId = getChatId();
+    if (!isInventoryAlertEnabled(db) || !serviceKeys.has(serviceKey)) {
       return { skipped: true, reason: 'disabled' };
     }
 
@@ -155,8 +161,8 @@ function createInventoryAlertService({ db }) {
   }
 
   return {
-    isEnabled: isInventoryAlertEnabled,
-    shouldRefreshServiceEveryCycle,
+    isEnabled: () => isInventoryAlertEnabled(db),
+    shouldRefreshServiceEveryCycle: (serviceKey) => shouldRefreshServiceEveryCycle(serviceKey, db),
     processProviderRefresh,
   };
 }

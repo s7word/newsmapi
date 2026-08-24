@@ -79,6 +79,33 @@ describe('inventory-alerts', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('uses chat id from database when env is empty', async () => {
+    delete process.env.TELEGRAM_NOTIFY_CHAT_ID;
+    const { setSetting } = await import('../src/lib/settings');
+    setSetting(db, 'telegram_notify_chat_id', '99999');
+
+    const service = createInventoryAlertService({ db });
+    expect(service.isEnabled()).toBe(true);
+
+    const result = await service.processProviderRefresh({
+      serviceKey: 'telegram',
+      providerKey: 'hero-sms',
+      providerName: 'Hero SMS',
+      previousPayload: {
+        offers: [
+          baseOffer({
+            inventoryTotal: 0,
+            status: 'out_of_stock',
+            tiers: [{ priceUsd: 0.2, priceOriginal: 0.2, stock: 0, providerRef: '' }],
+          }),
+        ],
+      },
+      newPayload: { offers: [baseOffer({ inventoryTotal: 5 })] },
+    });
+    expect(result.sent).toBe(true);
+    expect(global.fetch).toHaveBeenCalled();
+  });
+
   it('skips non-configured services', async () => {
     const service = createInventoryAlertService({ db });
     const result = await service.processProviderRefresh({
