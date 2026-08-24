@@ -15,7 +15,7 @@
 
 ### 报价刷新注意
 
-- **OnlineSim** 全量按国拉价容易触发 `INTERVAL_CONCURRENT_REQUESTS_ERROR`。默认并发 2、请求间隔 400ms、失败重试；可用 `ONLINESIM_RATES_CONCURRENCY` / `ONLINESIM_RATES_DELAY_MS` 调整。最短刷新间隔默认 5 分钟。
+- **OnlineSim** 全量按国拉价容易触发 `INTERVAL_CONCURRENT_REQUESTS_ERROR`。默认**顺序**拉价（`ONLINESIM_RATES_SEQUENTIAL=1`）、请求间隔 400ms、服务之间冷却 2.5s、目录缓存 90s；可用 `ONLINESIM_RATES_CONCURRENCY` / `ONLINESIM_RATES_DELAY_MS` / `ONLINESIM_SERVICE_COOLDOWN_MS` 调整。最短刷新间隔默认 5 分钟。连续刷新多个服务时不要并行打 OnlineSim。
 - **CodesVerify** 官方文档无批量报价，但 `https://api.codesverify.com/get_rates.php` 对 USA 可用；无库存字段。
 - **GetSMS** 必须 `GETSMS_USER` + Key，或设置里 `user|api_key`；只填 Key 会 Unauthorized。
 - 打开 SQLite 时会删除不在 `providers-catalog.js` 的 `provider_states` / `provider_snapshots`（例如历史 `sms-activate` 孤儿行）。
