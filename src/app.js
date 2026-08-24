@@ -38,9 +38,17 @@ const { testProviderKeySafe } = require('./lib/provider-key-test');
 const { buildProvidersPanel } = require('./lib/providers-panel');
 const {
   discoverTelegramNotifyChatId,
-  resolveTelegramNotifyChatId,
+  resolveTelegramNotifyChatIds,
 } = require('./lib/telegram-chat-discovery');
-const { sendTelegramMessage } = require('./lib/telegram-notifier');
+const {
+  addTelegramRecipient,
+  listTelegramRecipients,
+  maskChatId,
+  removeTelegramRecipient,
+  sendTelegramBroadcast,
+  updateTelegramRecipient,
+} = require('./lib/telegram-recipients');
+const { sendTelegramMessage, formatInventoryAlertLines } = require('./lib/telegram-notifier');
 const { isInventoryAlertEnabled } = require('./lib/inventory-alerts');
 const {
   getGatewayMeta,
@@ -313,7 +321,8 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
 
   app.get('/api/settings/telegram', requireAdmin(db), (req, res) => {
     setNoStore(res);
-    const chatId = resolveTelegramNotifyChatId(db, getSetting);
+    const chatIds = resolveTelegramNotifyChatIds(db, getSetting, setSetting);
+    const recipients = listTelegramRecipients(db, getSetting, setSetting);
     const tokenConfigured = Boolean(String(process.env.TELEGRAM_BOT_TOKEN || '').trim());
     let inventoryAlertLogCount = 0;
     try {
@@ -324,12 +333,63 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
     res.json({
       alertsEnabled: isInventoryAlertEnabled(db),
       tokenConfigured,
-      chatIdConfigured: Boolean(chatId),
-      chatIdMasked: chatId ? `${chatId.slice(0, 2)}***${chatId.slice(-2)}` : '',
+      chatIdConfigured: chatIds.length > 0,
+      recipientCount: chatIds.length,
+      chatIdMasked: chatIds[0] ? maskChatId(chatIds[0]) : '',
       botUsername: 'rscbot2026_bot',
       alertServiceKeys: String(process.env.TELEGRAM_ALERT_SERVICE_KEYS || 'telegram'),
       inventoryAlertLogCount,
+      recipients,
     });
+  });
+
+  app.get('/api/settings/telegram/recipients', requireAdmin(db), (req, res) => {
+    setNoStore(res);
+    res.json({
+      recipients: listTelegramRecipients(db, getSetting, setSetting),
+      recipientCount: resolveTelegramNotifyChatIds(db, getSetting, setSetting).length,
+    });
+  });
+
+  app.post('/api/settings/telegram/recipients', requireAdmin(db), (req, res) => {
+    setNoStore(res);
+    try {
+      const recipient = addTelegramRecipient(db, getSetting, setSetting, {
+        chatId: req.body?.chatId,
+        label: req.body?.label,
+      });
+      res.status(recipient.created ? 201 : 200).json({ ok: true, recipient });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message || 'add_failed' });
+    }
+  });
+
+  app.put('/api/settings/telegram/recipients/:id', requireAdmin(db), (req, res) => {
+    setNoStore(res);
+    try {
+      const recipient = updateTelegramRecipient(db, getSetting, setSetting, req.params.id, {
+        label: req.body?.label,
+        enabled: req.body?.enabled,
+        chatId: req.body?.chatId,
+      });
+      if (!recipient) {
+        res.status(404).json({ ok: false, error: 'not_found' });
+        return;
+      }
+      res.json({ ok: true, recipient });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message || 'update_failed' });
+    }
+  });
+
+  app.delete('/api/settings/telegram/recipients/:id', requireAdmin(db), (req, res) => {
+    setNoStore(res);
+    const removed = removeTelegramRecipient(db, getSetting, setSetting, req.params.id);
+    if (!removed) {
+      res.status(404).json({ ok: false, error: 'not_found' });
+      return;
+    }
+    res.json({ ok: true });
   });
 
   app.put('/api/settings/telegram', requireAdmin(db), (req, res) => {
@@ -339,8 +399,11 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       res.status(400).json({ ok: false, error: 'chat_id_required' });
       return;
     }
-    setSetting(db, 'telegram_notify_chat_id', chatId);
-    res.json({ ok: true, chatIdMasked: `${chatId.slice(0, 2)}***${chatId.slice(-2)}` });
+    const recipient = addTelegramRecipient(db, getSetting, setSetting, {
+      chatId,
+      label: String(req.body?.label || '默认推送'),
+    });
+    res.json({ ok: true, recipient });
   });
 
   app.post('/api/settings/telegram/test', requireAdmin(db), async (req, res) => {
@@ -351,9 +414,21 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       return;
     }
 
-    let chatId = resolveTelegramNotifyChatId(db, getSetting);
+    let chatIds = resolveTelegramNotifyChatIds(db, getSetting, setSetting);
     let discovery = null;
-    if (!chatId) {
+    const targetRecipientId = String(req.body?.recipientId || '').trim();
+
+    if (targetRecipientId) {
+      const recipient = listTelegramRecipients(db, getSetting, setSetting)
+        .find((row) => row.id === targetRecipientId && row.enabled);
+      if (!recipient) {
+        res.status(404).json({ ok: false, error: 'recipient_not_found' });
+        return;
+      }
+      chatIds = [recipient.chatId];
+    }
+
+    if (!chatIds.length) {
       const waitSeconds = Math.min(50, Math.max(0, Number(req.body?.waitSeconds || 0)));
       discovery = await discoverTelegramNotifyChatId({
         db,
@@ -362,33 +437,74 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
         botToken: token,
         longPollSeconds: waitSeconds,
       });
-      if (discovery.discovered && discovery.chatId) {
-        chatId = discovery.chatId;
-      }
+      chatIds = resolveTelegramNotifyChatIds(db, getSetting, setSetting);
     }
 
-    if (!chatId) {
+    if (!chatIds.length) {
       res.status(400).json({
         ok: false,
         error: 'chat_id_missing',
-        message: '尚未绑定 Telegram 聊天。请先向 @rscbot2026_bot 发送一条私聊消息，或在设置中填入 chat id。',
+        message: '尚未配置推送对象。请在推送管理中添加 Chat ID，或向 @rscbot2026_bot 发送私聊。',
         discovery,
       });
       return;
     }
 
+    const sampleText = formatInventoryAlertLines([
+      {
+        type: 'new_listing',
+        providerKey: 'smstg',
+        providerName: 'SMSTG',
+        countryIso2: 'IN',
+        countryName: 'India',
+        previousStock: 0,
+        newStock: 12,
+        minPriceUsd: 0.2,
+        currency: 'USD',
+      },
+      {
+        type: 'restock',
+        providerKey: 'smstg',
+        providerName: 'SMSTG',
+        countryIso2: 'BR',
+        countryName: 'Brazil',
+        previousStock: 0,
+        newStock: 8,
+        minPriceUsd: 0.35,
+        currency: 'USD',
+      },
+    ], {
+      serviceLabel: 'Telegram 接码',
+      providerName: 'SMSTG',
+      providerKey: 'smstg',
+      portalUrl: 'https://smstg.org',
+    });
+
+    const testHeader = '🧪 <b>SMSBazaar 推送格式测试</b>\n\n以下为模拟告警样式：\n\n';
+
     try {
-      await sendTelegramMessage({
+      const results = await sendTelegramBroadcast({
         botToken: token,
-        chatId,
-        text: [
-          '🧪 <b>SMSBazaar 测试推送</b>',
-          '',
-          '若你看到本条消息，说明 Bot Token 与 Chat ID 已正确配置，补货/上新告警可以正常送达。',
-          `时间：${new Date().toISOString()}`,
-        ].join('\n'),
+        chatIds,
+        text: `${testHeader}${sampleText}`,
+        sendTelegramMessage,
       });
-      res.json({ ok: true, sent: true, chatIdMasked: `${chatId.slice(0, 2)}***${chatId.slice(-2)}`, discovery });
+      const failed = results.filter((row) => !row.ok);
+      if (failed.length === results.length) {
+        res.status(502).json({
+          ok: false,
+          error: 'send_failed',
+          message: failed[0]?.error || 'all_failed',
+          results: results.map((row) => ({ ...row, chatId: maskChatId(row.chatId) })),
+        });
+        return;
+      }
+      res.json({
+        ok: true,
+        sent: true,
+        results: results.map((row) => ({ ...row, chatId: maskChatId(row.chatId) })),
+        discovery,
+      });
     } catch (error) {
       res.status(502).json({ ok: false, error: 'send_failed', message: error.message });
     }

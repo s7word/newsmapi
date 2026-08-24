@@ -57,22 +57,44 @@ async function sendTelegramMessage({ botToken, chatId, text, parseMode = 'HTML' 
   return payload;
 }
 
-function formatInventoryAlertLines(events, serviceLabel) {
-  const header = `📦 <b>${escapeHtml(serviceLabel)} 补货 / 上新</b>`;
+function formatInventoryAlertLines(events, options = {}) {
+  const {
+    serviceLabel = '接码',
+    providerName = '',
+    providerKey = '',
+    portalUrl = '',
+  } = options;
+
+  const platformTitle = escapeHtml(providerName || providerKey || '未知平台');
+  const platformKey = escapeHtml(providerKey || '—');
+  const portalLine = portalUrl
+    ? `\n🔗 <a href="${escapeHtml(portalUrl)}">打开 ${platformTitle} 平台</a>`
+    : '';
+
+  const header = [
+    `🏪 <b>平台：${platformTitle}</b>`,
+    `🆔 <code>${platformKey}</code>`,
+    `📱 服务：${escapeHtml(serviceLabel)}`,
+    portalLine,
+  ].filter(Boolean).join('\n');
+
   const lines = events.map((event) => {
-    const typeLabel = event.type === 'new_listing' ? '新上架' : '补货';
+    const typeLabel = event.type === 'new_listing' ? '🆕 新上架' : '📦 补货';
     const country = escapeHtml(event.countryName || event.countryIso2);
-    const provider = escapeHtml(event.providerName || event.providerKey);
+    const iso2 = escapeHtml(event.countryIso2);
     const stockLine = `${event.previousStock} → ${event.newStock}`;
     const priceUsd = Number(event.minPriceUsd || 0);
-    const priceLine = priceUsd > 0 ? `$${priceUsd.toFixed(4)}` : '—';
+    const currency = escapeHtml(event.currency || 'USD');
+    const priceLine = priceUsd > 0 ? `$${priceUsd.toFixed(4)} ${currency}` : '—';
     return [
-      `• <b>${typeLabel}</b> · ${provider}`,
-      `  ${country} (${escapeHtml(event.countryIso2)})`,
-      `  库存 ${stockLine} · ${priceLine}`,
+      `<b>${typeLabel}</b>`,
+      `国家：${country} (${iso2})`,
+      `库存：${stockLine}`,
+      `最低价：${priceLine}`,
     ].join('\n');
   });
-  return [header, ...lines].join('\n\n');
+
+  return [header, '━━━━━━━━━━━━━━', ...lines].join('\n\n');
 }
 
 module.exports = {

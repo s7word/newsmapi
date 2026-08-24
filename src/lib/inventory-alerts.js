@@ -6,8 +6,12 @@ const {
   sendTelegramMessage,
   splitTelegramMessages,
 } = require('./telegram-notifier');
-const { resolveTelegramNotifyChatId } = require('./telegram-chat-discovery');
-const { getSetting } = require('./settings');
+const {
+  resolveTelegramNotifyChatIds,
+  sendTelegramBroadcast,
+} = require('./telegram-recipients');
+const { getSetting, setSetting } = require('./settings');
+const { getProviderDefinition, resolvePortalUrl } = require('../config/providers-catalog');
 
 const ALERT_TYPE_LABELS = {
   new_listing: '新上架',
@@ -25,8 +29,10 @@ function parseServiceKeys(raw) {
 function isInventoryAlertEnabled(db = null) {
   const enabled = String(process.env.TELEGRAM_ALERT_ENABLED || 'true').toLowerCase() !== 'false';
   const token = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
-  const chatId = resolveTelegramNotifyChatId(db, getSetting);
-  return enabled && Boolean(token && chatId);
+  const chatIds = db
+    ? resolveTelegramNotifyChatIds(db, getSetting, setSetting)
+    : resolveTelegramNotifyChatIds(null, () => null, () => {});
+  return enabled && Boolean(token && chatIds.length);
 }
 
 function shouldRefreshServiceEveryCycle(serviceKey, db = null) {
@@ -100,8 +106,8 @@ function createInventoryAlertService({ db }) {
   const maxMessages = Number(process.env.TELEGRAM_ALERT_MAX_MESSAGES_PER_REFRESH || 20);
   const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
 
-  function getChatId() {
-    return resolveTelegramNotifyChatId(db, getSetting);
+  function getChatIds() {
+    return resolveTelegramNotifyChatIds(db, getSetting, setSetting);
   }
 
   async function processProviderRefresh({
@@ -111,7 +117,7 @@ function createInventoryAlertService({ db }) {
     previousPayload,
     newPayload,
   }) {
-    const chatId = getChatId();
+    const chatIds = getChatIds();
     if (!isInventoryAlertEnabled(db) || !serviceKeys.has(serviceKey)) {
       return { skipped: true, reason: 'disabled' };
     }
@@ -136,15 +142,23 @@ function createInventoryAlertService({ db }) {
     }
 
     const serviceLabel = serviceKey === 'telegram' ? 'Telegram 接码' : serviceKey;
-    const text = formatInventoryAlertLines(pending.map((row) => row.event), serviceLabel);
+    const definition = getProviderDefinition(providerKey);
+    const portalUrl = resolvePortalUrl(definition || {});
+    const text = formatInventoryAlertLines(pending.map((row) => row.event), {
+      serviceLabel,
+      providerName: providerName || definition?.displayName || providerKey,
+      providerKey,
+      portalUrl,
+    });
     const chunks = splitTelegramMessages(text);
     const sentChunks = chunks.slice(0, maxMessages);
 
     for (const chunk of sentChunks) {
-      await sendTelegramMessage({
+      await sendTelegramBroadcast({
         botToken,
-        chatId,
+        chatIds,
         text: chunk,
+        sendTelegramMessage,
       });
     }
 
@@ -156,6 +170,7 @@ function createInventoryAlertService({ db }) {
       sent: true,
       eventCount: pending.length,
       messageCount: sentChunks.length,
+      recipientCount: chatIds.length,
       types: pending.map((row) => row.event.type),
     };
   }

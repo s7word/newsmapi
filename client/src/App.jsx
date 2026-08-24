@@ -417,6 +417,136 @@ function ProviderSettingsCard({
   );
 }
 
+function TelegramPushSettings({
+  telegramConfig,
+  loading,
+  onReload,
+  onAddRecipient,
+  onRemoveRecipient,
+  onToggleRecipient,
+  onTestPush,
+  testingId,
+  pushMessage,
+}) {
+  const [chatId, setChatId] = useState('');
+  const [label, setLabel] = useState('');
+  const recipients = telegramConfig?.recipients || [];
+
+  return (
+    <div className="telegram-push-settings">
+      <div className="telegram-push-settings__intro">
+        <p>
+          管理补货 / 上新 Telegram 推送对象。Bot：
+          <strong> @{telegramConfig?.botUsername || 'rscbot2026_bot'}</strong>
+        </p>
+        <div className="telegram-push-settings__status">
+          <span className={telegramConfig?.alertsEnabled ? 'provider-settings-badge provider-settings-badge--ok' : 'provider-settings-badge provider-settings-badge--muted'}>
+            {telegramConfig?.alertsEnabled ? '告警已启用' : '告警未启用'}
+          </span>
+          <span className="provider-settings-badge provider-settings-badge--muted">
+            推送对象 {telegramConfig?.recipientCount || 0} 人
+          </span>
+          <span className="provider-settings-badge provider-settings-badge--muted">
+            已发送 {telegramConfig?.inventoryAlertLogCount || 0} 条
+          </span>
+        </div>
+      </div>
+
+      <form
+        className="telegram-push-form"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          await onAddRecipient({ chatId, label });
+          setChatId('');
+          setLabel('');
+        }}
+      >
+        <label>
+          Telegram Chat ID
+          <input
+            value={chatId}
+            onChange={(event) => setChatId(event.target.value)}
+            placeholder="例如 1184856337"
+            inputMode="numeric"
+          />
+        </label>
+        <label>
+          备注名（可选）
+          <input
+            value={label}
+            onChange={(event) => setLabel(event.target.value)}
+            placeholder="例如 张三 / 运营群"
+          />
+        </label>
+        <button type="submit" className="primary-button" disabled={!chatId.trim() || loading}>
+          添加推送对象
+        </button>
+      </form>
+
+      <div className="settings-panel-toolbar">
+        <button type="button" className="ghost-button" disabled={loading} onClick={() => onReload()}>
+          {loading ? '加载中…' : '刷新列表'}
+        </button>
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={loading || testingId === '__all__' || !recipients.length}
+          onClick={() => onTestPush()}
+        >
+          {testingId === '__all__' ? '发送中…' : '测试推送（全部）'}
+        </button>
+      </div>
+
+      <div className="telegram-recipient-list">
+        {loading && !recipients.length ? (
+          <div className="loading-card settings-panel-loading">正在加载推送对象…</div>
+        ) : null}
+        {!loading && !recipients.length ? (
+          <div className="telegram-recipient-empty">暂无推送对象。添加 Chat ID 后即可接收告警。</div>
+        ) : null}
+        {recipients.map((recipient) => (
+          <article key={recipient.id} className="telegram-recipient-card">
+            <div>
+              <h3>{recipient.label || '未命名'}</h3>
+              <p>{recipient.chatIdMasked || recipient.chatId}</p>
+            </div>
+            <div className="telegram-recipient-card__actions">
+              <label className="telegram-recipient-toggle">
+                <input
+                  type="checkbox"
+                  checked={recipient.enabled !== false}
+                  onChange={(event) => onToggleRecipient(recipient.id, event.target.checked)}
+                />
+                启用
+              </label>
+              <button
+                type="button"
+                className="ghost-button"
+                disabled={Boolean(testingId)}
+                onClick={() => onTestPush(recipient.id)}
+              >
+                {testingId === recipient.id ? '发送中…' : '测试'}
+              </button>
+              <button
+                type="button"
+                className="ghost-button telegram-recipient-card__delete"
+                disabled={Boolean(testingId)}
+                onClick={() => onRemoveRecipient(recipient.id)}
+              >
+                删除
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {pushMessage ? (
+        <div className={pushMessage.ok ? 'success-banner' : 'error-banner'}>{pushMessage.text}</div>
+      ) : null}
+    </div>
+  );
+}
+
 function SettingsModal({
   open,
   onClose,
@@ -432,6 +562,17 @@ function SettingsModal({
   onTestAllKeys,
   saving,
   message,
+  settingsTab,
+  onSettingsTabChange,
+  telegramConfig,
+  telegramLoading,
+  onReloadTelegram,
+  onAddTelegramRecipient,
+  onRemoveTelegramRecipient,
+  onToggleTelegramRecipient,
+  onTestTelegramPush,
+  telegramTestingId,
+  telegramMessage,
 }) {
   const [password, setPassword] = useState('');
   const [draftKeys, setDraftKeys] = useState({});
@@ -501,6 +642,41 @@ function SettingsModal({
             <button type="submit" className="primary-button">登录</button>
           </form>
         ) : (
+          <>
+            <div className="settings-tabs" role="tablist" aria-label="设置分类">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={settingsTab === 'providers'}
+                className={settingsTab === 'providers' ? 'settings-tabs__button is-active' : 'settings-tabs__button'}
+                onClick={() => onSettingsTabChange('providers')}
+              >
+                平台 API Key
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={settingsTab === 'telegram'}
+                className={settingsTab === 'telegram' ? 'settings-tabs__button is-active' : 'settings-tabs__button'}
+                onClick={() => onSettingsTabChange('telegram')}
+              >
+                推送 ID 管理
+              </button>
+            </div>
+
+            {settingsTab === 'telegram' ? (
+              <TelegramPushSettings
+                telegramConfig={telegramConfig}
+                loading={telegramLoading}
+                onReload={onReloadTelegram}
+                onAddRecipient={onAddTelegramRecipient}
+                onRemoveRecipient={onRemoveTelegramRecipient}
+                onToggleRecipient={onToggleTelegramRecipient}
+                onTestPush={onTestTelegramPush}
+                testingId={telegramTestingId}
+                pushMessage={telegramMessage}
+              />
+            ) : (
           <form
             className="settings-keys"
             onSubmit={async (event) => {
@@ -627,6 +803,8 @@ function SettingsModal({
               <button type="button" className="ghost-button" onClick={onLogout}>退出登录</button>
             </div>
           </form>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -655,6 +833,11 @@ function App() {
     sort: 'price_asc',
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('providers');
+  const [telegramConfig, setTelegramConfig] = useState(null);
+  const [telegramLoading, setTelegramLoading] = useState(false);
+  const [telegramTestingId, setTelegramTestingId] = useState('');
+  const [telegramMessage, setTelegramMessage] = useState(null);
   const [authenticated, setAuthenticated] = useState(Boolean(getAuthToken()));
   const [keyProviders, setKeyProviders] = useState([]);
   const [panelProviders, setPanelProviders] = useState([]);
@@ -674,6 +857,26 @@ function App() {
     root.dataset.theme = themePreference;
     window.localStorage.setItem('themePreference', themePreference);
   }, [themePreference]);
+
+  async function loadTelegramSettings({ silent = false } = {}) {
+    if (!silent) setTelegramLoading(true);
+    try {
+      const response = await fetch('/api/settings/telegram', { headers: authHeaders() });
+      if (!response.ok) {
+        if (response.status === 401) {
+          setAuthenticated(false);
+          setAuthToken('');
+        }
+        throw new Error('加载推送设置失败');
+      }
+      const payload = await response.json();
+      setTelegramConfig(payload);
+      setAuthenticated(true);
+      return payload;
+    } finally {
+      if (!silent) setTelegramLoading(false);
+    }
+  }
 
   async function loadKeySettings() {
     const response = await fetch('/api/settings/keys', { headers: authHeaders() });
@@ -755,6 +958,7 @@ function App() {
   useEffect(() => {
     if (!settingsOpen || !authenticated) return;
     loadProvidersPanel().catch(() => {});
+    loadTelegramSettings({ silent: true }).catch(() => {});
   }, [settingsOpen, authenticated, filters.service]);
 
   useEffect(() => {
@@ -1018,6 +1222,72 @@ function App() {
       setSettingsMessage(saveError.message || '保存失败');
     } finally {
       setSettingsSaving(false);
+    }
+  }
+
+  async function handleAddTelegramRecipient({ chatId, label }) {
+    setTelegramMessage(null);
+    try {
+      const response = await fetch('/api/settings/telegram/recipients', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId, label }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || '添加失败');
+      setTelegramMessage({ ok: true, text: `已添加推送对象 ${payload.recipient?.chatIdMasked || ''}` });
+      await loadTelegramSettings({ silent: true });
+    } catch (error) {
+      setTelegramMessage({ ok: false, text: error.message || '添加失败' });
+    }
+  }
+
+  async function handleRemoveTelegramRecipient(id) {
+    setTelegramMessage(null);
+    try {
+      const response = await fetch(`/api/settings/telegram/recipients/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
+      if (!response.ok) throw new Error('删除失败');
+      setTelegramMessage({ ok: true, text: '已删除推送对象' });
+      await loadTelegramSettings({ silent: true });
+    } catch (error) {
+      setTelegramMessage({ ok: false, text: error.message || '删除失败' });
+    }
+  }
+
+  async function handleToggleTelegramRecipient(id, enabled) {
+    setTelegramMessage(null);
+    const response = await fetch(`/api/settings/telegram/recipients/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!response.ok) throw new Error('更新失败');
+    await loadTelegramSettings({ silent: true });
+  }
+
+  async function handleTestTelegramPush(recipientId = null) {
+    setTelegramMessage(null);
+    setTelegramTestingId(recipientId || '__all__');
+    try {
+      const response = await fetch('/api/settings/telegram/test', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(recipientId ? { recipientId } : {}),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || payload.error || '测试推送失败');
+      const okCount = (payload.results || []).filter((row) => row.ok).length;
+      setTelegramMessage({
+        ok: true,
+        text: `测试推送已发送（成功 ${okCount}/${payload.results?.length || 0}）`,
+      });
+    } catch (error) {
+      setTelegramMessage({ ok: false, text: error.message || '测试推送失败' });
+    } finally {
+      setTelegramTestingId('');
     }
   }
 
@@ -1358,6 +1628,17 @@ function App() {
         onTestAllKeys={handleTestAllKeys}
         saving={settingsSaving}
         message={settingsMessage}
+        settingsTab={settingsTab}
+        onSettingsTabChange={setSettingsTab}
+        telegramConfig={telegramConfig}
+        telegramLoading={telegramLoading}
+        onReloadTelegram={() => loadTelegramSettings()}
+        onAddTelegramRecipient={handleAddTelegramRecipient}
+        onRemoveTelegramRecipient={handleRemoveTelegramRecipient}
+        onToggleTelegramRecipient={handleToggleTelegramRecipient}
+        onTestTelegramPush={handleTestTelegramPush}
+        telegramTestingId={telegramTestingId}
+        telegramMessage={telegramMessage}
       />
     </div>
   );

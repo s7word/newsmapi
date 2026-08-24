@@ -5,8 +5,9 @@ require('dotenv').config();
 
 const { createDatabase } = require('../lib/db');
 const { getSetting, setSetting } = require('../lib/settings');
-const { discoverTelegramNotifyChatId, resolveTelegramNotifyChatId } = require('../lib/telegram-chat-discovery');
-const { sendTelegramMessage } = require('../lib/telegram-notifier');
+const { discoverTelegramNotifyChatId, resolveTelegramNotifyChatIds } = require('../lib/telegram-chat-discovery');
+const { sendTelegramMessage, formatInventoryAlertLines } = require('../lib/telegram-notifier');
+const { sendTelegramBroadcast } = require('../lib/telegram-recipients');
 
 async function main() {
   const waitSeconds = Math.min(50, Math.max(0, Number(process.argv[2] || 0)));
@@ -19,8 +20,8 @@ async function main() {
     process.exit(1);
   }
 
-  let chatId = resolveTelegramNotifyChatId(db, getSetting);
-  if (!chatId) {
+  let chatIds = resolveTelegramNotifyChatIds(db, getSetting, setSetting);
+  if (!chatIds.length) {
     console.log(`未发现 Chat ID，${waitSeconds ? `长轮询 ${waitSeconds}s 等待私聊消息…` : '尝试 getUpdates…'}`);
     const discovery = await discoverTelegramNotifyChatId({
       db,
@@ -30,27 +31,40 @@ async function main() {
       longPollSeconds: waitSeconds,
     });
     console.log('discovery:', JSON.stringify(discovery, null, 2));
-    chatId = discovery.chatId || resolveTelegramNotifyChatId(db, getSetting);
+    chatIds = resolveTelegramNotifyChatIds(db, getSetting, setSetting);
   }
 
-  if (!chatId) {
-    console.error('仍无 Chat ID。请向 @rscbot2026_bot 发送一条私聊后重试：');
+  if (!chatIds.length) {
+    console.error('仍无 Chat ID。请在前端「推送 ID 管理」中添加，或向 @rscbot2026_bot 发送私聊后重试：');
     console.error('  node src/scripts/telegram-test-push.js 25');
     process.exit(1);
   }
 
-  await sendTelegramMessage({
-    botToken: token,
-    chatId,
-    text: [
-      '🧪 <b>SMSBazaar 测试推送</b>',
-      '',
-      '若你看到本条消息，说明 Bot 推送链路正常。',
-      `时间：${new Date().toISOString()}`,
-    ].join('\n'),
+  const sampleText = formatInventoryAlertLines([
+    {
+      type: 'restock',
+      countryIso2: 'IN',
+      countryName: 'India',
+      previousStock: 0,
+      newStock: 5,
+      minPriceUsd: 0.2,
+      currency: 'USD',
+    },
+  ], {
+    serviceLabel: 'Telegram 接码',
+    providerName: 'SMSTG',
+    providerKey: 'smstg',
+    portalUrl: 'https://smstg.org',
   });
 
-  console.log(`测试消息已发送至 chat id ${chatId}`);
+  await sendTelegramBroadcast({
+    botToken: token,
+    chatIds,
+    text: `🧪 <b>SMSBazaar 测试推送</b>\n\n${sampleText}`,
+    sendTelegramMessage,
+  });
+
+  console.log(`测试消息已发送至 ${chatIds.length} 个对象`);
 }
 
 main().catch((error) => {

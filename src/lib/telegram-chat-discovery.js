@@ -1,18 +1,15 @@
 'use strict';
 
 const TELEGRAM_API_ROOT = 'https://api.telegram.org';
-const TELEGRAM_NOTIFY_CHAT_SETTING = 'telegram_notify_chat_id';
+const {
+  addTelegramRecipient,
+  resolveTelegramNotifyChatId,
+  resolveTelegramNotifyChatIds,
+  LEGACY_CHAT_SETTING,
+} = require('./telegram-recipients');
 
 function getTelegramBotToken() {
   return String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
-}
-
-function resolveTelegramNotifyChatId(db, getSetting) {
-  const fromEnv = String(process.env.TELEGRAM_NOTIFY_CHAT_ID || '').trim();
-  if (fromEnv) return fromEnv;
-  if (!db || !getSetting) return '';
-  const stored = getSetting(db, TELEGRAM_NOTIFY_CHAT_SETTING, '');
-  return String(stored || '').trim();
 }
 
 async function fetchTelegramUpdates(botToken, offset = 0, longPollSeconds = 0) {
@@ -63,8 +60,10 @@ async function discoverTelegramNotifyChatId({
   const token = String(botToken || '').trim();
   if (!token) return { discovered: false, reason: 'no_token' };
 
-  const existing = resolveTelegramNotifyChatId(db, getSetting);
-  if (existing) return { discovered: true, chatId: existing, source: 'configured' };
+  const existing = resolveTelegramNotifyChatIds(db, getSetting, setSetting);
+  if (existing.length) {
+    return { discovered: true, chatId: existing[0], source: 'configured' };
+  }
 
   const payload = await fetchTelegramUpdates(token, 0, longPollSeconds);
   if (!payload?.ok) {
@@ -77,7 +76,10 @@ async function discoverTelegramNotifyChatId({
   }
 
   if (db && setSetting) {
-    setSetting(db, TELEGRAM_NOTIFY_CHAT_SETTING, picked.chatId);
+    addTelegramRecipient(db, getSetting, setSetting, {
+      chatId: picked.chatId,
+      label: picked.chatType === 'private' ? '自动发现' : `自动发现 (${picked.chatType})`,
+    });
   }
 
   const nextOffset = picked.updateId + 1;
@@ -145,11 +147,12 @@ function startTelegramChatDiscovery({
 }
 
 module.exports = {
-  TELEGRAM_NOTIFY_CHAT_SETTING,
+  LEGACY_CHAT_SETTING,
   discoverTelegramNotifyChatId,
   fetchTelegramUpdates,
   getTelegramBotToken,
   pickChatIdFromUpdates,
   resolveTelegramNotifyChatId,
+  resolveTelegramNotifyChatIds,
   startTelegramChatDiscovery,
 };

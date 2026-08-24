@@ -81,8 +81,9 @@ describe('inventory-alerts', () => {
 
   it('uses chat id from database when env is empty', async () => {
     delete process.env.TELEGRAM_NOTIFY_CHAT_ID;
-    const { setSetting } = await import('../src/lib/settings');
-    setSetting(db, 'telegram_notify_chat_id', '99999');
+    const { addTelegramRecipient } = await import('../src/lib/telegram-recipients');
+    const { getSetting, setSetting } = await import('../src/lib/settings');
+    addTelegramRecipient(db, getSetting, setSetting, { chatId: '99999', label: 'test' });
 
     const service = createInventoryAlertService({ db });
     expect(service.isEnabled()).toBe(true);
