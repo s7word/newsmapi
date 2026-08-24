@@ -158,14 +158,6 @@ function ThemeIcon({ theme }) {
   );
 }
 
-function GithubIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 .9a11.1 11.1 0 0 0-3.5 21.6c.55.1.75-.24.75-.53v-2c-3.05.67-3.7-1.3-3.7-1.3-.5-1.25-1.22-1.58-1.22-1.58-1-.68.08-.67.08-.67 1.1.08 1.68 1.14 1.68 1.14.98 1.68 2.58 1.2 3.2.92.1-.72.38-1.2.7-1.48-2.43-.28-5-1.22-5-5.42 0-1.2.43-2.18 1.13-2.95-.12-.28-.5-1.4.1-2.9 0 0 .93-.3 3.05 1.13A10.6 10.6 0 0 1 12 6.48c.94 0 1.9.13 2.78.38 2.12-1.43 3.05-1.13 3.05-1.13.6 1.5.22 2.62.1 2.9.7.77 1.13 1.75 1.13 2.95 0 4.22-2.58 5.14-5.03 5.4.4.35.75 1.03.75 2.08v3.08c0 .3.2.63.76.52A11.1 11.1 0 0 0 12 .9Z" />
-    </svg>
-  );
-}
-
 function getStoredThemePreference() {
   if (typeof window === 'undefined') return 'system';
   const stored = window.localStorage.getItem('themePreference');
@@ -1561,20 +1553,7 @@ function App() {
       </div>
 
       <div className="panel card">
-        <div className="project-links" aria-label="GitHub 项目入口">
-          <a
-            className="project-link"
-            href="https://github.com/FoundZiGu/SMSBazaar"
-            target="_blank"
-            rel="noreferrer"
-            title="本项目开源地址"
-          >
-            <GithubIcon />
-            <span>
-              <strong>上游开源</strong>
-              <small>FoundZiGu/SMSBazaar</small>
-            </span>
-          </a>
+        <div className="project-links" aria-label="快捷入口">
           <button type="button" className="project-link settings-inline" onClick={() => openSettingsModal('providers')}>
             <span>
               <strong>平台设置</strong>
