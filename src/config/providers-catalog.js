@@ -81,7 +81,8 @@ const PROVIDERS = [
     baseUrl: 'https://onlinesim.io/api',
     keyEnv: 'ONLINESIM_API_KEY',
     publicWithoutKey: false,
-    minRefreshIntervalMs: Number(process.env.ONLINESIM_REFRESH_INTERVAL_MS || 180000),
+    minRefreshIntervalMs: Number(process.env.ONLINESIM_REFRESH_INTERVAL_MS || 300000),
+    errorRetryIntervalMs: Number(process.env.ONLINESIM_ERROR_RETRY_INTERVAL_MS || 180000),
   },
   {
     providerKey: 'smspva',

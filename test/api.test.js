@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
-import { createDatabase, saveProviderSnapshot, saveProviderState } from '../src/lib/db';
+import { createDatabase, getAllProviderStates, purgeUnknownProviderRecords, saveProviderSnapshot, saveProviderState } from '../src/lib/db';
 import { setAdminPassword, upsertProviderKey } from '../src/lib/settings';
 
 describe('API endpoints', () => {
@@ -177,5 +177,30 @@ describe('API endpoints', () => {
       .send('{bad');
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('bad_request');
+  });
+
+  it('purges orphan sms-activate provider states not in the catalog', () => {
+    const db = createDatabase(':memory:');
+    saveProviderState(db, {
+      provider_key: 'sms-activate',
+      service_key: 'telegram',
+      status: 'error',
+      last_attempted_at: '2026-08-22T15:00:05.905Z',
+      last_success_at: null,
+      error_message: 'Missing API key',
+    });
+    saveProviderState(db, {
+      provider_key: 'smstg',
+      service_key: 'telegram',
+      status: 'success',
+      last_attempted_at: '2026-08-24T15:00:00.000Z',
+      last_success_at: '2026-08-24T15:00:00.000Z',
+      error_message: '',
+    });
+    expect(getAllProviderStates(db, 'telegram').has('sms-activate')).toBe(true);
+    expect(purgeUnknownProviderRecords(db)).toBeGreaterThan(0);
+    const states = getAllProviderStates(db, 'telegram');
+    expect(states.has('sms-activate')).toBe(false);
+    expect(states.has('smstg')).toBe(true);
   });
 });

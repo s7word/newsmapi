@@ -158,5 +158,7 @@ module.exports = {
   fetchClassicCountryLookup,
   getJson,
   getMaybeJson,
+  getText,
   makeOffer,
+  parseMaybeJson,
 };

@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const Database = require('better-sqlite3');
+const { listProviders } = require('../config/providers-catalog');
 
 const providerSnapshotCache = new WeakMap();
 
@@ -111,7 +112,44 @@ function createDatabase(databasePath) {
     migrateCompositeKeys(db);
   }
 
+  purgeUnknownProviderRecords(db);
   return db;
+}
+
+function quoteList(values) {
+  return values.map(() => '?').join(', ');
+}
+
+function purgeUnknownProviderRecords(db) {
+  const providers = listProviders();
+  const providerKeys = providers.map((provider) => provider.providerKey).filter(Boolean);
+  const keyEnvs = providers.map((provider) => provider.keyEnv).filter(Boolean);
+  if (!providerKeys.length) return 0;
+
+  const stateResult = db.prepare(`
+    DELETE FROM provider_states
+    WHERE provider_key NOT IN (${quoteList(providerKeys)})
+  `).run(...providerKeys);
+  const snapshotResult = db.prepare(`
+    DELETE FROM provider_snapshots
+    WHERE provider_key NOT IN (${quoteList(providerKeys)})
+  `).run(...providerKeys);
+
+  try {
+    if (keyEnvs.length) {
+      db.prepare(`
+        DELETE FROM provider_api_keys
+        WHERE key_env NOT IN (${quoteList(keyEnvs)})
+      `).run(...keyEnvs);
+    }
+  } catch {
+    // provider_api_keys may not exist in older test fixtures
+  }
+
+  if (stateResult.changes || snapshotResult.changes) {
+    providerSnapshotCache.delete(db);
+  }
+  return Number(stateResult.changes || 0) + Number(snapshotResult.changes || 0);
 }
 
 function upsertServiceConfig(db, serviceConfig) {
@@ -282,6 +320,7 @@ module.exports = {
   getProviderSnapshot,
   getServiceConfig,
   insertRefreshEvent,
+  purgeUnknownProviderRecords,
   saveExchangeRates,
   saveProviderSnapshot,
   saveProviderState,

@@ -361,6 +361,7 @@ describe('provider adapters', () => {
   });
 
   it('parses onlinesim per-country tariffs', async () => {
+    process.env.ONLINESIM_RATES_DELAY_MS = '0';
     mockFetchSequence([
       {
         response: '1',
@@ -387,6 +388,7 @@ describe('provider adapters', () => {
     expect(result.offers[0].countryIso2).toBe('US');
     expect(result.offers[0].tiers[0].priceOriginal).toBe(3.21);
     expect(result.offers[0].tiers[0].stock).toBe(42);
+    delete process.env.ONLINESIM_RATES_DELAY_MS;
   });
 
   it('parses sms-bus country prices', async () => {
@@ -440,5 +442,176 @@ describe('provider adapters', () => {
     expect(result.offers[0].countryIso2).toBe('US');
     expect(result.offers[0].tiers[0].priceOriginal).toBe(1.25);
     expect(result.offers[0].tiers[0].stock).toBe(120);
+  });
+
+  it('parses sms-rooms getPricesV3 country tiers', async () => {
+    mockFetchSequence([
+      { 1: { eng: 'United States' } },
+      { 1: { tg: { price: 0.22, count: 8 } } },
+    ]);
+    const { fetchProviderOffers } = await import('../src/lib/providers/sms-rooms');
+    const result = await fetchProviderOffers({
+      mapping: {
+        providerKey: 'sms-rooms',
+        displayName: 'SMS-Rooms',
+        serviceCode: 'tg',
+        baseUrl: 'https://sms-rooms.com/stubs/handler_api.php',
+      },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+    expect(result.error).toBe('');
+    expect(result.offers[0].countryIso2).toBe('US');
+    expect(result.offers[0].tiers[0].priceOriginal).toBe(0.22);
+    expect(result.offers[0].tiers[0].stock).toBe(8);
+  });
+
+  it('falls back from getPricesV3 BAD_ACTION to getPrices for sms-rooms', async () => {
+    mockFetchSequence([
+      { 12: { eng: 'United States' } },
+      'BAD_ACTION',
+      { 12: { tg: { cost: 0.18, count: 3 } } },
+    ]);
+    const { fetchProviderOffers } = await import('../src/lib/providers/sms-rooms');
+    const result = await fetchProviderOffers({
+      mapping: {
+        providerKey: 'sms-rooms',
+        displayName: 'SMS-Rooms',
+        serviceCode: 'tg',
+        baseUrl: 'https://sms-rooms.com/stubs/handler_api.php',
+      },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+    expect(result.error).toBe('');
+    expect(result.offers[0].tiers[0].priceOriginal).toBe(0.18);
+    expect(result.offers[0].tiers[0].stock).toBe(3);
+  });
+
+  it('reports sms-rooms BAD_KEY instead of unexpected payload', async () => {
+    mockFetchSequence(['BAD_KEY', 'BAD_KEY']);
+    const { fetchProviderOffers } = await import('../src/lib/providers/sms-rooms');
+    const result = await fetchProviderOffers({
+      mapping: {
+        providerKey: 'sms-rooms',
+        displayName: 'SMS-Rooms',
+        serviceCode: 'tg',
+        baseUrl: 'https://sms-rooms.com/stubs/handler_api.php',
+      },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+    expect(result.offers).toEqual([]);
+    expect(result.error).toContain('BAD_KEY');
+  });
+
+  it('matches SMSCode Telegram variants and classifies invalid keys', async () => {
+    const {
+      collectMatchingTiers,
+      parseRatesPayload,
+      fetchProviderOffers,
+    } = await import('../src/lib/providers/smscode');
+
+    const tiers = collectMatchingTiers([
+      { app: 'Telegram', rate: '0.40', stock: 5 },
+      { app: 'Telegram1', rate: '0.55' },
+      { app: 'WhatsApp', rate: '0.20', stock: 9 },
+    ], 'Telegram', 'Telegram');
+    expect(tiers).toEqual([
+      { priceOriginal: 0.4, stock: 5, providerRef: 'Telegram' },
+      { priceOriginal: 0.55, stock: 1, providerRef: 'Telegram1' },
+    ]);
+
+    expect(parseRatesPayload({ data: [{ app: 'Telegram', rate: '0.11' }] })).toHaveLength(1);
+    expect(() => parseRatesPayload('Customer Not Found.')).toThrow(/API Key 无效/);
+
+    mockFetchSequence(['Customer Not Found.']);
+    process.env.SMSCODE_COUNTRIES = 'USA';
+    const invalid = await fetchProviderOffers({
+      mapping: { providerKey: 'smscode', displayName: 'SMSCode.net', serviceCode: 'Telegram' },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+    expect(invalid.error).toContain('API Key 无效');
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      headers: new Headers({ 'content-type': 'text/plain' }),
+      text: async () => '',
+    });
+    const failed = await fetchProviderOffers({
+      mapping: { providerKey: 'smscode', displayName: 'SMSCode.net', serviceCode: 'Telegram' },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+    expect(failed.error).toContain('HTTP 500');
+    delete process.env.SMSCODE_COUNTRIES;
+  });
+
+  it('parses CodesVerify get_rates telegram tiers', async () => {
+    mockFetchSequence([[
+      { app: 'TelegramUS5', rate: '1.50' },
+      { app: 'Telegram7', rate: '0.30' },
+      { app: 'OpenAI', rate: '0.54' },
+    ]]);
+    const { fetchProviderOffers, collectMatchingTiers } = await import('../src/lib/providers/codesverify');
+    const tiers = collectMatchingTiers([
+      { app: 'TelegramUS5', rate: '1.50' },
+      { app: 'Telegram7', rate: '0.30' },
+      { app: 'OpenAI', rate: '0.54' },
+    ], 'telegram');
+    expect(tiers.map((tier) => tier.providerRef)).toEqual(['Telegram7', 'TelegramUS5']);
+
+    const result = await fetchProviderOffers({
+      mapping: { providerKey: 'codesverify', displayName: 'CodesVerify', serviceCode: 'telegram' },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+    expect(result.error).toBe('');
+    expect(result.offers[0].countryIso2).toBe('US');
+    expect(result.offers[0].minPriceOriginal).toBe(0.3);
+    expect(result.offers[0].tiers).toHaveLength(2);
+  });
+
+  it('retries OnlineSim catalog after INTERVAL_CONCURRENT_REQUESTS_ERROR', async () => {
+    process.env.ONLINESIM_RATES_DELAY_MS = '0';
+    process.env.ONLINESIM_RATES_RETRIES = '2';
+    mockFetchSequence([
+      { response: 'INTERVAL_CONCURRENT_REQUESTS_ERROR' },
+      {
+        response: '1',
+        country: 1,
+        countries: { _1: { name: 'USA', original: 'usa', code: 1, enable: true } },
+        services: { _telegram: { id: 7, count: 9, price: '1.25', slug: 'telegram' } },
+      },
+    ]);
+    const { fetchProviderOffers } = await import('../src/lib/providers/onlinesim');
+    const result = await fetchProviderOffers({
+      mapping: { providerKey: 'onlinesim', displayName: 'OnlineSim', serviceCode: 'telegram' },
+      exchangeRateService,
+      apiKey: 'key',
+    });
+    expect(result.error).toBe('');
+    expect(result.offers[0].tiers[0].priceOriginal).toBe(1.25);
+    expect(result.offers[0].tiers[0].stock).toBe(9);
+    delete process.env.ONLINESIM_RATES_DELAY_MS;
+    delete process.env.ONLINESIM_RATES_RETRIES;
+  });
+
+  it('explains GetSMS missing user as configuration, not a public API', async () => {
+    const previousUser = process.env.GETSMS_USER;
+    delete process.env.GETSMS_USER;
+    const { fetchProviderOffers, resolveCredentials } = await import('../src/lib/providers/getsms');
+    expect(() => resolveCredentials('only-a-key')).toThrow(/user\|api_key/);
+    const result = await fetchProviderOffers({
+      mapping: { providerKey: 'getsms', displayName: 'GetSMS', serviceCode: 'Telegram' },
+      exchangeRateService,
+      apiKey: 'only-a-key',
+    });
+    expect(result.error).toMatch(/GETSMS_USER|user\|api_key/);
+    expect(result.error).toMatch(/没有公开报价接口/);
+    if (previousUser === undefined) delete process.env.GETSMS_USER;
+    else process.env.GETSMS_USER = previousUser;
   });
 });

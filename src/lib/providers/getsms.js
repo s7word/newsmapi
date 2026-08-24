@@ -26,7 +26,9 @@ function resolveCredentials(apiKey) {
 
   const user = String(process.env.GETSMS_USER || '').trim();
   if (!user) {
-    throw new Error('Missing GETSMS_USER (or use user|api_key in settings)');
+    throw new Error(
+      'GetSMS 需同时配置用户名/邮箱与 API Key：设置填写 user|api_key（如 you@mail.com|密钥），或环境变量 GETSMS_USER + GETSMS_API_KEY。仅填写 Key 无法通过鉴权，该平台没有公开报价接口。',
+    );
   }
 
   return { user, apiKey: trimmed };

@@ -13,6 +13,13 @@
 - 强刷浏览器或清缓存后再看 UI 顶部「已配置/在线平台」计数。
 - 部分平台仅映射特定服务（如 SMSTG 仅 **Telegram**）：在 OPENAI 默认视图下设置里能看到平台，但比价表无数据；需切换到 Telegram 服务并刷新报价。
 
+### 报价刷新注意
+
+- **OnlineSim** 全量按国拉价容易触发 `INTERVAL_CONCURRENT_REQUESTS_ERROR`。默认并发 2、请求间隔 400ms、失败重试；可用 `ONLINESIM_RATES_CONCURRENCY` / `ONLINESIM_RATES_DELAY_MS` 调整。最短刷新间隔默认 5 分钟。
+- **CodesVerify** 官方文档无批量报价，但 `https://api.codesverify.com/get_rates.php` 对 USA 可用；无库存字段。
+- **GetSMS** 必须 `GETSMS_USER` + Key，或设置里 `user|api_key`；只填 Key 会 Unauthorized。
+- 打开 SQLite 时会删除不在 `providers-catalog.js` 的 `provider_states` / `provider_snapshots`（例如历史 `sms-activate` 孤儿行）。
+
 ### SMSTG
 
 - API 根：`https://smstg.org/api`（`getBalance` / `buy` / `getOtp`）。
