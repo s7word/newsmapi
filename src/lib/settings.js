@@ -182,6 +182,8 @@ function listProviderKeySettings(db) {
       source: stored ? 'database' : (fromEnv ? 'env' : (provider.publicWithoutKey ? 'public' : 'none')),
       maskedKey: maskKey(effective),
       hasKey: Boolean(effective),
+      settingsHint: provider.settingsHint || '',
+      keyPlaceholder: provider.keyPlaceholder || '',
     };
   });
 }

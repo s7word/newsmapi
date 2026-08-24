@@ -192,6 +192,8 @@ const PROVIDERS = [
     baseUrl: 'https://getsms.online/api_command.php',
     keyEnv: 'GETSMS_API_KEY',
     publicWithoutKey: false,
+    settingsHint: '必须同时提供用户名/邮箱与 API Key：设置里填 user|api_key（例 you@mail.com|密钥），或环境变量 GETSMS_USER。只填 Key 会 Unauthorized，官网没有公开报价接口。',
+    keyPlaceholder: 'you@mail.com|API密钥',
     minRefreshIntervalMs: Number(process.env.GETSMS_REFRESH_INTERVAL_MS || 300000),
   },
   {

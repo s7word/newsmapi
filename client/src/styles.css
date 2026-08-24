@@ -1140,6 +1140,13 @@ button.project-link {
   grid-column: span 2;
 }
 
+.provider-settings-card__hint {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .provider-settings-card__error {
   font-size: 0.86rem;
   border-radius: 10px;

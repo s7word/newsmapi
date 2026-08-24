@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { listProviders, resolvePortalUrl } from '../src/config/providers-catalog';
+import { getProviderDefinition, listProviders, resolvePortalUrl } from '../src/config/providers-catalog';
 
 describe('resolvePortalUrl', () => {
   it('uses portal override for smsbower', () => {
@@ -28,5 +28,12 @@ describe('resolvePortalUrl', () => {
     for (const provider of listProviders()) {
       expect(resolvePortalUrl(provider), provider.providerKey).toMatch(/^https?:\/\//);
     }
+  });
+
+  it('documents GetSMS user|api_key configuration in the catalog', () => {
+    const getsms = getProviderDefinition('getsms');
+    expect(getsms.settingsHint).toMatch(/user\|api_key/);
+    expect(getsms.keyPlaceholder).toMatch(/@/);
+    expect(getsms.publicWithoutKey).toBe(false);
   });
 });

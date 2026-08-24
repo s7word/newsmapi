@@ -380,6 +380,10 @@ function ProviderSettingsCard({
         ) : null}
       </div>
 
+      {provider.settingsHint ? (
+        <p className="provider-settings-card__hint">{provider.settingsHint}</p>
+      ) : null}
+
       {(refresh.errorMessage || (connectivity && !connectivity.ok && connectivity.message)) ? (
         <div className="provider-settings-card__error">
           {refresh.errorMessage || connectivity.message}
@@ -397,7 +401,11 @@ function ProviderSettingsCard({
         <input
           type="password"
           autoComplete="off"
-          placeholder={provider.hasKey ? '留空保留现有 Key；输入新值覆盖' : '粘贴 API Key'}
+          placeholder={
+            provider.keyPlaceholder
+              ? (provider.hasKey ? `留空保留现有 Key；覆盖请填 ${provider.keyPlaceholder}` : provider.keyPlaceholder)
+              : (provider.hasKey ? '留空保留现有 Key；输入新值覆盖' : '粘贴 API Key')
+          }
           value={draftValue}
           onChange={(event) => onDraftChange(event.target.value)}
         />
