@@ -15,7 +15,7 @@ const {
 const { getProvider } = require('./providers');
 const { resolveProviderApiKey } = require('./settings');
 
-function createRefreshController({ db, exchangeRateService, refreshCooldownMs }) {
+function createRefreshController({ db, exchangeRateService, refreshCooldownMs, inventoryAlertService = null }) {
   let isRunning = false;
   let lastManualTriggerAt = 0;
   let currentPromise = null;
@@ -74,11 +74,12 @@ function createRefreshController({ db, exchangeRateService, refreshCooldownMs })
 
         const provider = getProvider(mapping.providerKey);
         const apiKey = resolveProviderApiKey(db, mapping.keyEnv);
+        const previousSnapshot = getProviderSnapshot(db, mapping.providerKey, serviceKey);
         const result = await provider.fetchProviderOffers({
           mapping,
           apiKey,
           exchangeRateService,
-          previousSnapshot: getProviderSnapshot(db, mapping.providerKey, serviceKey)?.payload || null,
+          previousSnapshot: previousSnapshot?.payload || null,
         });
 
         const attemptedAt = new Date().toISOString();
@@ -96,6 +97,22 @@ function createRefreshController({ db, exchangeRateService, refreshCooldownMs })
             error_message: result.error,
           });
           return result;
+        }
+
+        if (inventoryAlertService?.processProviderRefresh) {
+          try {
+            await inventoryAlertService.processProviderRefresh({
+              serviceKey,
+              providerKey: mapping.providerKey,
+              providerName: mapping.displayName,
+              previousPayload: previousSnapshot?.payload || null,
+              newPayload: result,
+            });
+          } catch (alertError) {
+            console.error(
+              `Inventory alert failed for ${mapping.providerKey}/${serviceKey}: ${alertError.message}`,
+            );
+          }
         }
 
         saveProviderSnapshot(db, mapping.providerKey, result, serviceKey);
@@ -164,7 +181,8 @@ function createRefreshController({ db, exchangeRateService, refreshCooldownMs })
         // On scheduled refresh, only refresh OpenAI every cycle; other services refresh every 5th cycle via time bucket.
         if (reason === 'scheduled' && key !== 'openai_chatgpt') {
           const bucket = Math.floor(Date.now() / Number(process.env.REFRESH_INTERVAL_MS || 60000));
-          if (bucket % 5 !== 0) continue;
+          const refreshEveryCycle = inventoryAlertService?.shouldRefreshServiceEveryCycle?.(key);
+          if (!refreshEveryCycle && bucket % 5 !== 0) continue;
         }
         results.push(await runRefreshForService(key, reason));
       }

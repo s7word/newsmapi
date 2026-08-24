@@ -8,7 +8,7 @@ const { createDatabase, upsertServiceConfig } = require('./lib/db');
 const { createExchangeRateService } = require('./lib/exchange-rates');
 const { createRefreshController } = require('./lib/refresh-controller');
 const { createOpenAiCountrySync } = require('./lib/openai-country-sync');
-const { bootstrapAdminPassword } = require('./lib/settings');
+const { createInventoryAlertService } = require('./lib/inventory-alerts');
 
 const port = Number(process.env.PORT || 8787);
 const host = String(process.env.HOST || '0.0.0.0').trim() || '0.0.0.0';
@@ -30,10 +30,13 @@ async function bootstrap() {
     rateUrl: exchangeRateUrl,
   });
 
+  const inventoryAlertService = createInventoryAlertService({ db });
+
   const refreshController = createRefreshController({
     db,
     exchangeRateService,
     refreshCooldownMs,
+    inventoryAlertService,
   });
 
   const countrySyncController = createOpenAiCountrySync({

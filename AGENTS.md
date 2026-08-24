@@ -17,3 +17,10 @@
 
 - API 根：`https://smstg.org/api`（`getBalance` / `buy` / `getOtp`）。
 - Key 环境变量：`SMSTG_API_KEY`；公开页抓取报价，可无 Key 刷新 Telegram 服务快照。
+
+### Telegram 补货 / 上新通知
+
+- 环境变量：`TELEGRAM_BOT_TOKEN`、`TELEGRAM_NOTIFY_CHAT_ID`（先给 Bot 发一条消息，再用 `getUpdates` 或 @userinfobot 获取 chat id）。
+- 默认仅监听 `telegram` 服务快照 diff（新国家上架、库存 0→有货）。
+- 启用后 Telegram 服务会每个刷新周期拉价（不再每 5 轮才刷一次）。
+- **勿将 Bot Token 提交到仓库**；已在聊天中泄露的 Token 建议在 @BotFather 重置。

@@ -21,5 +21,12 @@ module.exports = defineConfig({
     root: __dirname,
     include: ['test/**/*.{test,spec}.{js,jsx}'],
     setupFiles: path.resolve(__dirname, 'test/setup.js'),
+    deps: {
+      optimizer: {
+        web: {
+          enabled: false,
+        },
+      },
+    },
   },
 });
