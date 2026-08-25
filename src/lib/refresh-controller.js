@@ -171,10 +171,16 @@ function createRefreshController({ db, exchangeRateService, refreshCooldownMs, i
         ? [serviceKey]
         : listServices().map((service) => service.serviceKey);
 
-      // Scheduled/startup: refresh default OpenAI first for fast first paint, then others.
+      // Scheduled: refresh alert-monitored services first so long OpenAI cycles
+      // do not block Telegram inventory pushes for hours.
+      const alertFirst = targets.filter((key) => inventoryAlertService?.shouldRefreshServiceEveryCycle?.(key));
       const ordered = serviceKey
         ? targets
-        : ['openai_chatgpt', ...targets.filter((key) => key !== 'openai_chatgpt')];
+        : [
+          ...alertFirst,
+          'openai_chatgpt',
+          ...targets.filter((key) => key !== 'openai_chatgpt' && !alertFirst.includes(key)),
+        ];
 
       const results = [];
       for (const key of ordered) {
