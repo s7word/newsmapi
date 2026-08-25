@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { createDatabase } from '../src/lib/db';
-import { createInventoryAlertService } from '../src/lib/inventory-alerts';
+import {
+  buildDedupeKey,
+  createInventoryAlertService,
+  parseRestockCooldownMs,
+} from '../src/lib/inventory-alerts';
 
 describe('inventory-alerts', () => {
   let db;
@@ -12,7 +16,7 @@ describe('inventory-alerts', () => {
     process.env.TELEGRAM_BOT_TOKEN = 'test-token';
     process.env.TELEGRAM_NOTIFY_CHAT_ID = '12345';
     process.env.TELEGRAM_ALERT_SERVICE_KEYS = 'telegram';
-    process.env.TELEGRAM_ALERT_RESTOCK_COOLDOWN_MS = '3600000';
+    process.env.TELEGRAM_ALERT_RESTOCK_COOLDOWN_MS = '0';
     global.fetch = vi.fn(async () => ({
       ok: true,
       text: async () => JSON.stringify({ ok: true }),
@@ -42,9 +46,9 @@ describe('inventory-alerts', () => {
     ...overrides,
   });
 
-  it('sends telegram message on restock and dedupes repeats', async () => {
+  it('notifies every 0→stock restock episode when cooldown is 0', async () => {
     const service = createInventoryAlertService({ db });
-    const previousPayload = {
+    const outOfStock = {
       offers: [
         baseOffer({
           inventoryTotal: 0,
@@ -53,8 +57,45 @@ describe('inventory-alerts', () => {
         }),
       ],
     };
+
+    const first = await service.processProviderRefresh({
+      serviceKey: 'telegram',
+      providerKey: 'hero-sms',
+      providerName: 'Hero SMS',
+      previousPayload: outOfStock,
+      newPayload: { offers: [baseOffer({ inventoryTotal: 12 })] },
+    });
+    expect(first.sent).toBe(true);
+    expect(first.eventCount).toBe(1);
+    expect(first.types).toEqual(['restock']);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    const second = await service.processProviderRefresh({
+      serviceKey: 'telegram',
+      providerKey: 'hero-sms',
+      providerName: 'Hero SMS',
+      previousPayload: outOfStock,
+      newPayload: { offers: [baseOffer({ inventoryTotal: 8 })] },
+    });
+    expect(second.sent).toBe(true);
+    expect(second.eventCount).toBe(1);
+    expect(second.types).toEqual(['restock']);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('never re-notifies the same new listing', async () => {
+    const service = createInventoryAlertService({ db });
+    const previousPayload = { offers: [baseOffer({ countryIso2: 'US', countryName: 'United States' })] };
     const newPayload = {
-      offers: [baseOffer({ inventoryTotal: 12 })],
+      offers: [
+        baseOffer({ countryIso2: 'US', countryName: 'United States' }),
+        baseOffer({
+          countryIso2: 'IN',
+          countryName: 'India',
+          countryDisplayName: 'India',
+          inventoryTotal: 5,
+        }),
+      ],
     };
 
     const first = await service.processProviderRefresh({
@@ -66,6 +107,7 @@ describe('inventory-alerts', () => {
     });
     expect(first.sent).toBe(true);
     expect(first.eventCount).toBe(1);
+    expect(first.types).toEqual(['new_listing']);
     expect(global.fetch).toHaveBeenCalledTimes(1);
 
     const second = await service.processProviderRefresh({
@@ -77,6 +119,31 @@ describe('inventory-alerts', () => {
     });
     expect(second.skipped).toBe(true);
     expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses a unique restock dedupe key when cooldown is 0 (no Infinity bucket)', () => {
+    expect(parseRestockCooldownMs(undefined)).toBe(0);
+    expect(parseRestockCooldownMs('0')).toBe(0);
+    expect(parseRestockCooldownMs('abc')).toBe(0);
+    expect(parseRestockCooldownMs('5000')).toBe(5000);
+
+    const key = buildDedupeKey('telegram', {
+      type: 'restock',
+      providerKey: 'hero-sms',
+      countryIso2: 'BR',
+      previousStock: 0,
+      newStock: 12,
+    }, 0);
+    expect(key).not.toContain('Infinity');
+    expect(key).toMatch(/^telegram:hero-sms:BR:restock:0-12-\d+$/);
+
+    const bucketed = buildDedupeKey('telegram', {
+      type: 'restock',
+      providerKey: 'hero-sms',
+      countryIso2: 'BR',
+    }, 3600000);
+    expect(bucketed).toMatch(/^telegram:hero-sms:BR:restock:\d+$/);
+    expect(bucketed).not.toContain('Infinity');
   });
 
   it('uses chat id from database when env is empty', async () => {

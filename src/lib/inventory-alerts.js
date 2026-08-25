@@ -94,18 +94,29 @@ function createInventoryAlertStore(db) {
   };
 }
 
+function parseRestockCooldownMs(raw = process.env.TELEGRAM_ALERT_RESTOCK_COOLDOWN_MS) {
+  if (raw == null || raw === '') return 0;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return value;
+}
+
 function buildDedupeKey(serviceKey, event, cooldownMs) {
   if (event.type === 'new_listing') {
     return `${serviceKey}:${event.providerKey}:${event.countryIso2}:new_listing`;
   }
-  const bucket = Math.floor(Date.now() / cooldownMs);
-  return `${serviceKey}:${event.providerKey}:${event.countryIso2}:restock:${bucket}`;
+  // Optional anti-flap only. cooldownMs <= 0 must not divide by zero (Infinity bucket).
+  if (Number.isFinite(cooldownMs) && cooldownMs > 0) {
+    const bucket = Math.floor(Date.now() / cooldownMs);
+    return `${serviceKey}:${event.providerKey}:${event.countryIso2}:restock:${bucket}`;
+  }
+  return `${serviceKey}:${event.providerKey}:${event.countryIso2}:restock:${event.previousStock}-${event.newStock}-${Date.now()}`;
 }
 
 function createInventoryAlertService({ db }) {
   const store = createInventoryAlertStore(db);
   const serviceKeys = parseServiceKeys(process.env.TELEGRAM_ALERT_SERVICE_KEYS);
-  const restockCooldownMs = Number(process.env.TELEGRAM_ALERT_RESTOCK_COOLDOWN_MS || 21600000);
+  const restockCooldownMs = parseRestockCooldownMs();
   const maxMessages = Number(process.env.TELEGRAM_ALERT_MAX_MESSAGES_PER_REFRESH || 20);
   const botToken = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
 
@@ -137,10 +148,20 @@ function createInventoryAlertService({ db }) {
     });
 
     const pending = [];
+    const seenRestockCountries = new Set();
     for (const event of events) {
+      if (event.type === 'restock') {
+        const countryKey = `${event.providerKey}:${event.countryIso2}`;
+        if (seenRestockCountries.has(countryKey)) continue;
+        seenRestockCountries.add(countryKey);
+      }
+
       const dedupeKey = buildDedupeKey(serviceKey, event, restockCooldownMs);
-      const cooldown = event.type === 'new_listing' ? Number.MAX_SAFE_INTEGER : restockCooldownMs;
-      if (store.wasRecentlyNotified(dedupeKey, cooldown)) continue;
+      if (event.type === 'new_listing') {
+        if (store.wasRecentlyNotified(dedupeKey, Number.MAX_SAFE_INTEGER)) continue;
+      } else if (restockCooldownMs > 0) {
+        if (store.wasRecentlyNotified(dedupeKey, restockCooldownMs)) continue;
+      }
       pending.push({ event, dedupeKey });
     }
 
@@ -210,7 +231,9 @@ function createInventoryAlertService({ db }) {
 
 module.exports = {
   ALERT_TYPE_LABELS,
+  buildDedupeKey,
   createInventoryAlertService,
   isInventoryAlertEnabled,
+  parseRestockCooldownMs,
   shouldRefreshServiceEveryCycle,
 };

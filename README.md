@@ -121,10 +121,10 @@ TELEGRAM_ALERT_ENABLED=true
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_NOTIFY_CHAT_ID=
 TELEGRAM_ALERT_SERVICE_KEYS=telegram
-TELEGRAM_ALERT_RESTOCK_COOLDOWN_MS=21600000
+TELEGRAM_ALERT_RESTOCK_COOLDOWN_MS=0
 ```
 
-**Telegram 通知**：对比 `telegram` 服务每次刷新前后的快照，向 Bot 推送「新国家上架」或「库存 0→有货」。向 Bot 发一条私聊消息后，服务会自动从 `getUpdates` 发现 chat id 并写入数据库；也可手动填入 `TELEGRAM_NOTIFY_CHAT_ID`。**勿将 Bot Token 写入 Git**；若 Token 曾在聊天中泄露，请在 @BotFather 重置。
+**Telegram 通知**：对比 `telegram` 服务每次刷新前后的快照，向 Bot 推送「新国家上架」或「库存 0→有货」。补货对每次 0→有货都会推送，默认无 6 小时静音（`TELEGRAM_ALERT_RESTOCK_COOLDOWN_MS` 仅作可选短冷却防抖动）。向 Bot 发一条私聊消息后，服务会自动从 `getUpdates` 发现 chat id 并写入数据库；也可手动填入 `TELEGRAM_NOTIFY_CHAT_ID`。**勿将 Bot Token 写入 Git**；若 Token 曾在聊天中泄露，请在 @BotFather 重置。
 
 也可以在启动后打开前端右上角「设置」，用 `ADMIN_PASSWORD`（或兼容的 `ADMIN_REFRESH_TOKEN`）登录，把 Key 写入 SQLite。数据库中的 Key 优先于环境变量。
 
