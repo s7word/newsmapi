@@ -96,6 +96,45 @@ describe('formatInventoryAlertLines', () => {
     expect(text).not.toContain('平台链接');
   });
 
+  it('sorts alert lines by unit price from low to high', () => {
+    const events = [
+      {
+        type: 'restock',
+        countryIso2: 'US',
+        countryName: 'United States',
+        previousStock: 5,
+        newStock: 20,
+        minPriceUsd: 1.5,
+        currency: 'USD',
+      },
+      {
+        type: 'new_listing',
+        countryIso2: 'IN',
+        countryName: 'India',
+        previousStock: 0,
+        newStock: 12,
+        minPriceUsd: 0.2,
+        currency: 'USD',
+      },
+      {
+        type: 'restock',
+        countryIso2: 'GB',
+        countryName: 'United Kingdom',
+        previousStock: 1,
+        newStock: 8,
+        minPriceUsd: 0.85,
+        currency: 'USD',
+      },
+    ];
+
+    const text = formatInventoryAlertLines(events, { includeSource: false });
+    expect(text.indexOf('India (IN)')).toBeLessThan(text.indexOf('United Kingdom (GB)'));
+    expect(text.indexOf('United Kingdom (GB)')).toBeLessThan(text.indexOf('United States (US)'));
+    expect(text).toContain('$0.2000');
+    expect(text).toContain('$0.8500');
+    expect(text).toContain('$1.5000');
+  });
+
   it('omits platform name, code, and link when includeSource is false', () => {
     const text = formatInventoryAlertLines(sampleEvents, {
       serviceLabel: 'Telegram 接码',

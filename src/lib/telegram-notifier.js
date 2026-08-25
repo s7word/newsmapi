@@ -82,6 +82,21 @@ function formatAccountBalanceLine(accountBalance) {
   return `💰 账户余额：${escapeHtml(formatted)}`;
 }
 
+function sortInventoryAlertEvents(events) {
+  return [...events].sort((a, b) => {
+    const priceA = Number(a.minPriceUsd);
+    const priceB = Number(b.minPriceUsd);
+    const validA = Number.isFinite(priceA) && priceA > 0;
+    const validB = Number.isFinite(priceB) && priceB > 0;
+    if (validA && validB && priceA !== priceB) return priceA - priceB;
+    if (validA && !validB) return -1;
+    if (!validA && validB) return 1;
+    const countryA = String(a.countryName || a.countryIso2 || '');
+    const countryB = String(b.countryName || b.countryIso2 || '');
+    return countryA.localeCompare(countryB, 'en');
+  });
+}
+
 function formatInventoryAlertLines(events, options = {}) {
   const {
     serviceLabel = '接码',
@@ -108,7 +123,7 @@ function formatInventoryAlertLines(events, options = {}) {
     header.push(`📱 服务：${escapeHtml(serviceLabel)}`);
   }
 
-  const lines = events.map((event) => {
+  const lines = sortInventoryAlertEvents(events).map((event) => {
     const typeLabel = event.type === 'new_listing' ? '🆕 新上架' : '📦 补货';
     const country = escapeHtml(event.countryName || event.countryIso2);
     const iso2 = escapeHtml(event.countryIso2);
