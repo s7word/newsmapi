@@ -83,6 +83,47 @@ describe('inventory-alerts', () => {
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('notifies when in-stock inventory increases', async () => {
+    const service = createInventoryAlertService({ db });
+    const result = await service.processProviderRefresh({
+      serviceKey: 'telegram',
+      providerKey: 'hero-sms',
+      providerName: 'Hero SMS',
+      previousPayload: { offers: [baseOffer({ inventoryTotal: 5 })] },
+      newPayload: { offers: [baseOffer({ inventoryTotal: 20 })] },
+    });
+    expect(result.sent).toBe(true);
+    expect(result.eventCount).toBe(1);
+    expect(result.types).toEqual(['restock']);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(body.text).toContain('📦 补货');
+    expect(body.text).toContain('5 → 20');
+  });
+
+  it('does not notify when inventory decreases or stays the same', async () => {
+    const service = createInventoryAlertService({ db });
+    const decrease = await service.processProviderRefresh({
+      serviceKey: 'telegram',
+      providerKey: 'hero-sms',
+      providerName: 'Hero SMS',
+      previousPayload: { offers: [baseOffer({ inventoryTotal: 20 })] },
+      newPayload: { offers: [baseOffer({ inventoryTotal: 5 })] },
+    });
+    expect(decrease.skipped).toBe(true);
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    const unchanged = await service.processProviderRefresh({
+      serviceKey: 'telegram',
+      providerKey: 'hero-sms',
+      providerName: 'Hero SMS',
+      previousPayload: { offers: [baseOffer({ inventoryTotal: 5 })] },
+      newPayload: { offers: [baseOffer({ inventoryTotal: 5 })] },
+    });
+    expect(unchanged.skipped).toBe(true);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it('never re-notifies the same new listing', async () => {
     const service = createInventoryAlertService({ db });
     const previousPayload = { offers: [baseOffer({ countryIso2: 'US', countryName: 'United States' })] };

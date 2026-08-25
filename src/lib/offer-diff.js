@@ -65,8 +65,10 @@ function diffProviderOffers({
 
     const previousStock = Number(previousOffer.inventoryTotal || 0);
     const wasInStock = isInStock(previousOffer);
+    const restockedFromEmpty = !wasInStock && newInStock;
+    const inventoryIncreased = newStock > previousStock;
 
-    if (!wasInStock && newInStock) {
+    if (restockedFromEmpty || inventoryIncreased) {
       events.push({
         type: 'restock',
         providerKey: newOffer.providerKey || providerKey,

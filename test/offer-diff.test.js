@@ -81,12 +81,48 @@ describe('offer-diff', () => {
           tiers: [{ priceUsd: 0.12, priceOriginal: 0.12, stock: 0, providerRef: '' }],
         }),
       ],
-      newOffers: [baseOffer({ inventoryTotal: 42 })],
+      newOffers: [baseOffer({ inventoryTotal: 8 })],
     });
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe('restock');
     expect(events[0].previousStock).toBe(0);
-    expect(events[0].newStock).toBe(42);
+    expect(events[0].newStock).toBe(8);
+  });
+
+  it('detects restock when in-stock inventory increases', async () => {
+    const mod = await loadDiffModule();
+    const events = mod.diffProviderOffers({
+      providerKey: 'hero-sms',
+      providerName: 'Hero SMS',
+      previousOffers: [baseOffer({ inventoryTotal: 5 })],
+      newOffers: [baseOffer({ inventoryTotal: 20 })],
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe('restock');
+    expect(events[0].previousStock).toBe(5);
+    expect(events[0].newStock).toBe(20);
+  });
+
+  it('ignores inventory decreases', async () => {
+    const mod = await loadDiffModule();
+    const events = mod.diffProviderOffers({
+      providerKey: 'hero-sms',
+      providerName: 'Hero SMS',
+      previousOffers: [baseOffer({ inventoryTotal: 20 })],
+      newOffers: [baseOffer({ inventoryTotal: 5 })],
+    });
+    expect(events).toEqual([]);
+  });
+
+  it('ignores unchanged inventory', async () => {
+    const mod = await loadDiffModule();
+    const events = mod.diffProviderOffers({
+      providerKey: 'hero-sms',
+      providerName: 'Hero SMS',
+      previousOffers: [baseOffer({ inventoryTotal: 5 })],
+      newOffers: [baseOffer({ inventoryTotal: 5 })],
+    });
+    expect(events).toEqual([]);
   });
 
   it('ignores countries that stay out of stock', async () => {
