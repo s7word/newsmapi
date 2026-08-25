@@ -3,6 +3,7 @@
 require('dotenv').config();
 
 const { buildServiceConfig } = require('./config/service-config');
+const { listServices } = require('./config/services-catalog');
 const { createApp } = require('./app');
 const { createDatabase, upsertServiceConfig } = require('./lib/db');
 const { createExchangeRateService } = require('./lib/exchange-rates');
@@ -79,8 +80,18 @@ async function bootstrap() {
     console.log(`Server listening on http://${host}:${port}`);
   });
 
+  const alertStartupKeys = listServices()
+    .map((service) => service.serviceKey)
+    .filter((key) => inventoryAlertService.shouldRefreshServiceEveryCycle?.(key));
+
+  for (const key of alertStartupKeys) {
+    refreshController.refreshAll('startup', key).catch((error) => {
+      console.error(`Initial ${key} refresh failed: ${error.message}`);
+    });
+  }
+
   refreshController.refreshAll('startup', 'openai_chatgpt').catch((error) => {
-    console.error(`Initial refresh failed: ${error.message}`);
+    console.error(`Initial openai_chatgpt refresh failed: ${error.message}`);
   });
   countrySyncController.start();
 

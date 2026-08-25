@@ -16,9 +16,14 @@ const { getProvider } = require('./providers');
 const { resolveProviderApiKey } = require('./settings');
 
 function createRefreshController({ db, exchangeRateService, refreshCooldownMs, inventoryAlertService = null }) {
-  let isRunning = false;
+  /** Per-service locks so a multi-hour OpenAI refresh does not block Telegram alert cycles. */
+  const runningServices = new Set();
   let lastManualTriggerAt = 0;
   let currentPromise = null;
+
+  function isAnyServiceRunning() {
+    return runningServices.size > 0;
+  }
 
   function getReusableProviderResult(mapping, serviceKey, reason) {
     const minRefreshIntervalMs = Number(mapping.minRefreshIntervalMs || 0);
@@ -52,6 +57,11 @@ function createRefreshController({ db, exchangeRateService, refreshCooldownMs, i
   }
 
   async function runRefreshForService(serviceKey, reason = 'scheduled') {
+    if (runningServices.has(serviceKey)) {
+      return { accepted: false, reason: 'already_running', serviceKey };
+    }
+
+    runningServices.add(serviceKey);
     const serviceConfig = buildServiceConfig(serviceKey);
     upsertServiceConfig(db, serviceConfig);
     const eventId = insertRefreshEvent(db, new Date().toISOString());
@@ -145,12 +155,18 @@ function createRefreshController({ db, exchangeRateService, refreshCooldownMs, i
         error: error.message,
       });
       return { accepted: true, status: 'error', serviceKey, error: error.message };
+    } finally {
+      runningServices.delete(serviceKey);
     }
   }
 
+  function shouldDeferLongOpenAiRefresh(reason, serviceKey) {
+    return serviceKey === 'openai_chatgpt' && (reason === 'scheduled' || reason === 'startup');
+  }
+
   async function runRefresh(reason = 'scheduled', serviceKey = null) {
-    if (isRunning) {
-      return { accepted: false, reason: 'already_running' };
+    if (serviceKey && runningServices.has(serviceKey)) {
+      return { accepted: false, reason: 'already_running', serviceKey };
     }
 
     if (reason === 'manual') {
@@ -165,42 +181,52 @@ function createRefreshController({ db, exchangeRateService, refreshCooldownMs, i
       lastManualTriggerAt = now;
     }
 
-    isRunning = true;
-    try {
-      const targets = serviceKey
-        ? [serviceKey]
-        : listServices().map((service) => service.serviceKey);
-
-      // Scheduled: refresh alert-monitored services first so long OpenAI cycles
-      // do not block Telegram inventory pushes for hours.
-      const alertFirst = targets.filter((key) => inventoryAlertService?.shouldRefreshServiceEveryCycle?.(key));
-      const ordered = serviceKey
-        ? targets
-        : [
-          ...alertFirst,
-          'openai_chatgpt',
-          ...targets.filter((key) => key !== 'openai_chatgpt' && !alertFirst.includes(key)),
-        ];
-
-      const results = [];
-      for (const key of ordered) {
-        // On scheduled refresh, only refresh OpenAI every cycle; other services refresh every 5th cycle via time bucket.
-        if (reason === 'scheduled' && key !== 'openai_chatgpt') {
-          const bucket = Math.floor(Date.now() / Number(process.env.REFRESH_INTERVAL_MS || 60000));
-          const refreshEveryCycle = inventoryAlertService?.shouldRefreshServiceEveryCycle?.(key);
-          if (!refreshEveryCycle && bucket % 5 !== 0) continue;
-        }
-        results.push(await runRefreshForService(key, reason));
-      }
-      return { accepted: true, status: 'success', results };
-    } finally {
-      isRunning = false;
+    if (serviceKey) {
+      return await runRefreshForService(serviceKey, reason);
     }
+
+    const targets = listServices().map((service) => service.serviceKey);
+
+    // Scheduled: refresh alert-monitored services first so long OpenAI cycles
+    // do not block Telegram inventory pushes for hours.
+    const alertFirst = targets.filter((key) => inventoryAlertService?.shouldRefreshServiceEveryCycle?.(key));
+    const ordered = [
+      ...alertFirst,
+      'openai_chatgpt',
+      ...targets.filter((key) => key !== 'openai_chatgpt' && !alertFirst.includes(key)),
+    ];
+
+    const results = [];
+    for (const key of ordered) {
+      // On scheduled refresh, only refresh OpenAI every cycle; other services refresh every 5th cycle via time bucket.
+      if (reason === 'scheduled' && key !== 'openai_chatgpt') {
+        const bucket = Math.floor(Date.now() / Number(process.env.REFRESH_INTERVAL_MS || 60000));
+        const refreshEveryCycle = inventoryAlertService?.shouldRefreshServiceEveryCycle?.(key);
+        if (!refreshEveryCycle && bucket % 5 !== 0) continue;
+      }
+
+      if (shouldDeferLongOpenAiRefresh(reason, key)) {
+        if (!runningServices.has(key)) {
+          void runRefreshForService(key, reason).catch((error) => {
+            console.error(`Deferred ${key} refresh failed: ${error.message}`);
+          });
+        }
+        continue;
+      }
+
+      if (runningServices.has(key)) {
+        results.push({ accepted: false, reason: 'already_running', serviceKey: key });
+        continue;
+      }
+      results.push(await runRefreshForService(key, reason));
+    }
+    return { accepted: true, status: 'success', results };
   }
 
   function getState(serviceKey = null) {
     return {
-      isRunning,
+      isRunning: isAnyServiceRunning(),
+      runningServices: [...runningServices],
       currentPromise,
       latestEvent: getLatestRefreshEvent(db),
       snapshots: getAllProviderSnapshots(db, serviceKey),
@@ -217,8 +243,8 @@ function createRefreshController({ db, exchangeRateService, refreshCooldownMs, i
   }
 
   function triggerRefresh(reason = 'manual', serviceKey = null) {
-    if (isRunning) {
-      return { accepted: false, reason: 'already_running' };
+    if (serviceKey && runningServices.has(serviceKey)) {
+      return { accepted: false, reason: 'already_running', serviceKey };
     }
 
     // Kick off async work; do not embed the Promise in the HTTP payload.

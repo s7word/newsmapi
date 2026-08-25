@@ -3,6 +3,8 @@
 ### 开发服务
 
 - 开发：`npm run dev`（Express `8787` + Vite `5173`，Vite 会代理 API）。
+- **端口映射**：API 与 Vite 须监听 `0.0.0.0`（`HOST=0.0.0.0`、`npm run dev:client -- --host 0.0.0.0`）。云端本地映射请用 **5173**（前端）或 **8787**（API）；若打不开先 `lsof -i :5173 -i :8787` 并重启 tmux `smsbazaar-server` / `smsbazaar-vite-live`。
+- 定时刷新：**Telegram（告警）先于 OpenAI** 执行；OpenAI 全量刷新在后台独立运行，**不会阻塞**每分钟 Telegram 补货推送（按服务分锁）。
 - 生产静态资源：`npm run build` 后 `npm start`（`client/dist`）。
 - 测试：`npm test`。
 
