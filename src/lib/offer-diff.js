@@ -24,6 +24,7 @@ function isInStock(offer) {
 
 /**
  * Compare provider offer snapshots for inventory alert events.
+ * Emits restock on 0→有货 and when in-stock inventory increases.
  * Skips baseline when previous offers are empty (first successful catalog).
  */
 function diffProviderOffers({
