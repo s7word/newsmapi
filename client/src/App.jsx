@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import WebhookPushSettings from './WebhookPushSettings';
 
 const SORT_OPTIONS = [
   { value: 'price_asc', label: '价格从低到高' },
@@ -769,6 +770,13 @@ function SettingsModal({
   onTestTelegramPush,
   telegramTestingId,
   telegramMessage,
+  webhookConfig,
+  webhookLoading,
+  onSaveWebhook,
+  onTestWebhook,
+  webhookSaving,
+  webhookTesting,
+  webhookMessage,
 }) {
   const [password, setPassword] = useState('');
   const [draftKeys, setDraftKeys] = useState({});
@@ -895,6 +903,16 @@ function SettingsModal({
                   <span className="settings-tabs__icon" aria-hidden="true">📣</span>
                   Telegram 推送
                 </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={settingsTab === 'webhook'}
+                  className={settingsTab === 'webhook' ? 'settings-tabs__button is-active' : 'settings-tabs__button'}
+                  onClick={() => onSettingsTabChange('webhook')}
+                >
+                  <span className="settings-tabs__icon" aria-hidden="true">🔌</span>
+                  程序推送
+                </button>
               </div>
 
               {settingsTab === 'telegram' ? (
@@ -909,6 +927,16 @@ function SettingsModal({
                   onTestPush={onTestTelegramPush}
                   testingId={telegramTestingId}
                   pushMessage={telegramMessage}
+                />
+              ) : settingsTab === 'webhook' ? (
+                <WebhookPushSettings
+                  webhookConfig={webhookConfig}
+                  loading={webhookLoading}
+                  onSave={onSaveWebhook}
+                  onTest={onTestWebhook}
+                  saving={webhookSaving}
+                  testing={webhookTesting}
+                  message={webhookMessage}
                 />
               ) : (
                 <form
@@ -1051,6 +1079,11 @@ function App() {
   const [telegramLoading, setTelegramLoading] = useState(false);
   const [telegramTestingId, setTelegramTestingId] = useState('');
   const [telegramMessage, setTelegramMessage] = useState(null);
+  const [webhookConfig, setWebhookConfig] = useState(null);
+  const [webhookLoading, setWebhookLoading] = useState(false);
+  const [webhookSaving, setWebhookSaving] = useState(false);
+  const [webhookTesting, setWebhookTesting] = useState(false);
+  const [webhookMessage, setWebhookMessage] = useState(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [authUser, setAuthUser] = useState('');
@@ -1104,6 +1137,25 @@ function App() {
       return payload;
     } finally {
       if (!silent) setTelegramLoading(false);
+    }
+  }
+
+  async function loadWebhookSettings({ silent = false } = {}) {
+    if (!silent) setWebhookLoading(true);
+    try {
+      const response = await fetch('/api/settings/webhook', { headers: authHeaders() });
+      if (!response.ok) {
+        if (response.status === 401) {
+          setAuthenticated(false);
+          setAuthToken('');
+        }
+        throw new Error('加载程序推送设置失败');
+      }
+      const payload = await response.json();
+      setWebhookConfig(payload);
+      return payload;
+    } finally {
+      if (!silent) setWebhookLoading(false);
     }
   }
 
@@ -1212,6 +1264,7 @@ function App() {
     if (!settingsOpen || !authenticated) return;
     loadProvidersPanel().catch(() => {});
     loadTelegramSettings({ silent: true }).catch(() => {});
+    loadWebhookSettings({ silent: true }).catch(() => {});
   }, [settingsOpen, authenticated, filters.service]);
 
   useEffect(() => {
@@ -1590,6 +1643,51 @@ function App() {
     }
   }
 
+  async function handleSaveWebhook(patch) {
+    setWebhookMessage(null);
+    setWebhookSaving(true);
+    try {
+      const response = await fetch('/api/settings/webhook', {
+        method: 'PUT',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || '保存失败');
+      setWebhookConfig(payload);
+      setWebhookMessage({ ok: true, text: '程序推送设置已保存' });
+    } catch (error) {
+      setWebhookMessage({ ok: false, text: error.message || '保存失败' });
+      throw error;
+    } finally {
+      setWebhookSaving(false);
+    }
+  }
+
+  async function handleTestWebhook({ url, secret } = {}) {
+    setWebhookMessage(null);
+    setWebhookTesting(true);
+    try {
+      const response = await fetch('/api/settings/webhook/test', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, secret }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.result?.error || payload.error || '测试推送失败');
+      }
+      setWebhookMessage({
+        ok: true,
+        text: `测试已发送（HTTP ${payload.result?.status || 200}）`,
+      });
+    } catch (error) {
+      setWebhookMessage({ ok: false, text: error.message || '测试推送失败' });
+    } finally {
+      setWebhookTesting(false);
+    }
+  }
+
   const providerOptions = useMemo(() => (meta?.providers || []).map((provider) => ({
     value: provider.providerKey,
     label: provider.displayName,
@@ -1955,6 +2053,13 @@ function App() {
         onTestTelegramPush={handleTestTelegramPush}
         telegramTestingId={telegramTestingId}
         telegramMessage={telegramMessage}
+        webhookConfig={webhookConfig}
+        webhookLoading={webhookLoading}
+        onSaveWebhook={handleSaveWebhook}
+        onTestWebhook={handleTestWebhook}
+        webhookSaving={webhookSaving}
+        webhookTesting={webhookTesting}
+        webhookMessage={webhookMessage}
       />
     </div>
   );

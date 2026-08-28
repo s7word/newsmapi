@@ -15,6 +15,10 @@ const { getSetting, setSetting } = require('./settings');
 const { getProviderDefinition, resolvePortalUrl } = require('../config/providers-catalog');
 const { getProviderAlertCode } = require('../config/provider-alert-codes');
 const { resolveProviderAccountBalance } = require('./provider-account-balance');
+const {
+  dispatchAlertWebhook,
+  getAlertWebhookConfig,
+} = require('./alert-webhook');
 
 const ALERT_TYPE_LABELS = {
   new_listing: '新上架',
@@ -38,8 +42,18 @@ function isInventoryAlertEnabled(db = null) {
   return enabled && Boolean(token && chatIds.length);
 }
 
+function isWebhookAlertEnabled(db = null) {
+  if (!db) return false;
+  const config = getAlertWebhookConfig(db);
+  return Boolean(config.enabled && config.url);
+}
+
+function isAlertPipelineEnabled(db = null) {
+  return isInventoryAlertEnabled(db) || isWebhookAlertEnabled(db);
+}
+
 function shouldRefreshServiceEveryCycle(serviceKey, db = null) {
-  if (!isInventoryAlertEnabled(db)) return false;
+  if (!isAlertPipelineEnabled(db)) return false;
   return parseServiceKeys(process.env.TELEGRAM_ALERT_SERVICE_KEYS).has(serviceKey);
 }
 
@@ -131,12 +145,14 @@ function createInventoryAlertService({ db }) {
     previousPayload,
     newPayload,
   }) {
-    if (!isInventoryAlertEnabled(db) || !serviceKeys.has(serviceKey)) {
+    if (!serviceKeys.has(serviceKey) || !isAlertPipelineEnabled(db)) {
       return { skipped: true, reason: 'disabled' };
     }
 
-    const recipients = getRecipientsForProvider(providerKey);
-    if (!recipients.length) {
+    const telegramEnabled = isInventoryAlertEnabled(db);
+    const recipients = telegramEnabled ? getRecipientsForProvider(providerKey) : [];
+    const webhookEnabled = isWebhookAlertEnabled(db);
+    if (!recipients.length && !webhookEnabled) {
       return { skipped: true, reason: 'no_recipients' };
     }
 
@@ -175,39 +191,60 @@ function createInventoryAlertService({ db }) {
     const displayName = providerName || definition?.displayName || '';
     const pendingEvents = pending.map((row) => row.event);
     const accountBalance = await resolveProviderAccountBalance(db, providerKey);
-    const withSource = formatInventoryAlertLines(pendingEvents, {
-      serviceLabel,
-      providerName: displayName,
-      alertCode,
-      includeSource: true,
-      portalUrl: resolvePortalUrl(definition || { providerKey }),
-      accountBalance,
-    });
-    const withoutSource = formatInventoryAlertLines(pendingEvents, {
-      serviceLabel,
-      includeSource: false,
-    });
 
-    const sourceRecipients = recipients.filter((row) => row.includeSource !== false);
-    const genericRecipients = recipients.filter((row) => row.includeSource === false);
     let messageCount = 0;
+    if (recipients.length) {
+      const withSource = formatInventoryAlertLines(pendingEvents, {
+        serviceLabel,
+        providerName: displayName,
+        alertCode,
+        includeSource: true,
+        portalUrl: resolvePortalUrl(definition || { providerKey }),
+        accountBalance,
+      });
+      const withoutSource = formatInventoryAlertLines(pendingEvents, {
+        serviceLabel,
+        includeSource: false,
+      });
 
-    async function broadcastTo(targetRecipients, text) {
-      if (!targetRecipients.length) return;
-      const chunks = splitTelegramMessages(text).slice(0, maxMessages);
-      messageCount += chunks.length;
-      for (const chunk of chunks) {
-        await sendTelegramBroadcast({
-          botToken,
-          chatIds: targetRecipients.map((row) => row.chatId),
-          text: chunk,
-          sendTelegramMessage,
-        });
+      const sourceRecipients = recipients.filter((row) => row.includeSource !== false);
+      const genericRecipients = recipients.filter((row) => row.includeSource === false);
+
+      async function broadcastTo(targetRecipients, text) {
+        if (!targetRecipients.length) return;
+        const chunks = splitTelegramMessages(text).slice(0, maxMessages);
+        messageCount += chunks.length;
+        for (const chunk of chunks) {
+          await sendTelegramBroadcast({
+            botToken,
+            chatIds: targetRecipients.map((row) => row.chatId),
+            text: chunk,
+            sendTelegramMessage,
+          });
+        }
       }
+
+      await broadcastTo(sourceRecipients, withSource);
+      await broadcastTo(genericRecipients, withoutSource);
     }
 
-    await broadcastTo(sourceRecipients, withSource);
-    await broadcastTo(genericRecipients, withoutSource);
+    let webhookResult = { skipped: true, reason: 'disabled' };
+    if (webhookEnabled) {
+      try {
+        webhookResult = await dispatchAlertWebhook({
+          db,
+          serviceKey,
+          serviceLabel,
+          providerKey,
+          providerName: displayName,
+          events: pendingEvents,
+          accountBalance,
+        });
+      } catch (error) {
+        webhookResult = { ok: false, error: error.message || 'webhook_failed' };
+        console.error(`Alert webhook failed for ${providerKey}/${serviceKey}: ${error.message}`);
+      }
+    }
 
     for (const row of pending) {
       store.recordNotification(row.event, serviceKey, row.dedupeKey);
@@ -218,12 +255,13 @@ function createInventoryAlertService({ db }) {
       eventCount: pending.length,
       messageCount,
       recipientCount: recipients.length,
+      webhook: webhookResult,
       types: pending.map((row) => row.event.type),
     };
   }
 
   return {
-    isEnabled: () => isInventoryAlertEnabled(db),
+    isEnabled: () => isAlertPipelineEnabled(db),
     shouldRefreshServiceEveryCycle: (serviceKey) => shouldRefreshServiceEveryCycle(serviceKey, db),
     processProviderRefresh,
   };
@@ -233,7 +271,9 @@ module.exports = {
   ALERT_TYPE_LABELS,
   buildDedupeKey,
   createInventoryAlertService,
+  isAlertPipelineEnabled,
   isInventoryAlertEnabled,
+  isWebhookAlertEnabled,
   parseRestockCooldownMs,
   shouldRefreshServiceEveryCycle,
 };

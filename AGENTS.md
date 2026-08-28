@@ -35,6 +35,7 @@
 - 默认仅监听 `telegram` 服务快照 diff（新国家上架、库存 0→有货）。补货对每次 0→有货都会推送，默认无 6 小时静音。
 - 推送对象按人配置：`includeSource` 控制是否带内部来源编号（P01…），`providerKeys` 为 `null` 表示全部平台、数组为过滤名单。`includeSource=true` 时正文显示编号、展示名、账户余额（`provider_connectivity_tests` 缓存，缺/超过 24h 且有 Key 才现场测）、`打开平台查看` HTML 链接，以及明文 `🔗 平台链接：https://...` 兜底（部分 Telegram 客户端不易察觉纯 `<a>` 文案）。`includeSource=false` 时这些都不带。不要带 `baseUrl` / `keyEnv` / `providerKey`。
 - 启用后 Telegram 服务会每个刷新周期拉价（不再每 5 轮才刷一次）。
+- **程序推送（Webhook）**：设置 →「程序推送」。把简化 JSON 推到外部程序；可过滤最高单价、仅有余额平台、平台白名单。协议见 `docs/alert-webhook.md`（`smsall.alert.v1`）。
 - **勿将 Bot Token 提交到仓库**；已在聊天中泄露的 Token 建议在 @BotFather 重置。
 
 ### 远程服务器开发（smsall · Docker）

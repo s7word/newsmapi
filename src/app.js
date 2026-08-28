@@ -58,6 +58,13 @@ const {
   isSiteAuthDisabled,
 } = require('./lib/site-auth');
 const {
+  getAlertWebhookConfig,
+  postAlertWebhook,
+  publicWebhookConfig,
+  saveAlertWebhookConfig,
+  buildWebhookPayload,
+} = require('./lib/alert-webhook');
+const {
   getGatewayMeta,
   getUnifiedBalance,
   getUnifiedPrices,
@@ -439,6 +446,89 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       label: String(req.body?.label || '默认推送'),
     });
     res.json({ ok: true, recipient });
+  });
+
+  app.get('/api/settings/webhook', requireAdmin(db), (req, res) => {
+    setNoStore(res);
+    const config = getAlertWebhookConfig(db);
+    res.json({
+      ok: true,
+      webhook: publicWebhookConfig(config),
+      docsPath: '/docs/alert-webhook.md',
+      schema: 'smsall.alert.v1',
+      providerCatalog: listProviderAlertCatalog(),
+    });
+  });
+
+  app.put('/api/settings/webhook', requireAdmin(db), (req, res) => {
+    setNoStore(res);
+    try {
+      const saved = saveAlertWebhookConfig(db, {
+        enabled: req.body?.enabled,
+        url: req.body?.url,
+        secret: req.body?.secret === '********'
+          ? getAlertWebhookConfig(db).secret
+          : req.body?.secret,
+        timeoutMs: req.body?.timeoutMs,
+        filters: req.body?.filters,
+      });
+      if (saved.enabled && !saved.url) {
+        res.status(400).json({ ok: false, error: 'url_required' });
+        return;
+      }
+      res.json({ ok: true, webhook: publicWebhookConfig(saved) });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message || 'save_failed' });
+    }
+  });
+
+  app.post('/api/settings/webhook/test', requireAdmin(db), async (req, res) => {
+    setNoStore(res);
+    const config = getAlertWebhookConfig(db);
+    const url = String(req.body?.url || config.url || '').trim();
+    if (!url) {
+      res.status(400).json({ ok: false, error: 'url_required' });
+      return;
+    }
+
+    const samplePayload = buildWebhookPayload({
+      serviceKey: 'telegram',
+      serviceLabel: 'Telegram 接码',
+      providerKey: 'smstg',
+      providerName: 'SMSTG',
+      accountBalance: { balance: '12.50', currency: 'USD' },
+      events: [
+        {
+          type: 'restock',
+          providerKey: 'smstg',
+          providerName: 'SMSTG',
+          countryIso2: 'IN',
+          countryName: 'India',
+          previousStock: 0,
+          newStock: 18,
+          minPriceUsd: 0.12,
+          currency: 'USD',
+        },
+      ],
+    });
+
+    const result = await postAlertWebhook({
+      config: {
+        ...config,
+        enabled: true,
+        url,
+        secret: req.body?.secret === '********' || req.body?.secret == null
+          ? config.secret
+          : String(req.body.secret || ''),
+      },
+      payload: samplePayload,
+    });
+
+    res.status(result.ok ? 200 : 502).json({
+      ok: Boolean(result.ok),
+      result,
+      sample: samplePayload,
+    });
   });
 
   app.post('/api/settings/telegram/test', requireAdmin(db), async (req, res) => {
