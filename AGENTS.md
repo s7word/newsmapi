@@ -36,3 +36,11 @@
 - 推送对象按人配置：`includeSource` 控制是否带内部来源编号（P01…），`providerKeys` 为 `null` 表示全部平台、数组为过滤名单。`includeSource=true` 时正文显示编号、展示名、账户余额（`provider_connectivity_tests` 缓存，缺/超过 24h 且有 Key 才现场测）、`打开平台查看` HTML 链接，以及明文 `🔗 平台链接：https://...` 兜底（部分 Telegram 客户端不易察觉纯 `<a>` 文案）。`includeSource=false` 时这些都不带。不要带 `baseUrl` / `keyEnv` / `providerKey`。
 - 启用后 Telegram 服务会每个刷新周期拉价（不再每 5 轮才刷一次）。
 - **勿将 Bot Token 提交到仓库**；已在聊天中泄露的 Token 建议在 @BotFather 重置。
+
+### 远程服务器开发（xxxtg）
+
+- 主机：`187.127.218.157`，工作目录：`/opt/xxxtg`
+- 迁移说明：`docs/migrate-to-xxxtg.md`；安装脚本：`scripts/xxxtg/install-on-server.sh`；密钥打包：`scripts/xxxtg/pack-secrets-for-migrate.sh`
+- 生产进程：`systemd` 单元 `smsbazaar`（`scripts/xxxtg/smsbazaar.service`），监听 `HOST=0.0.0.0` `PORT=8787`
+- Agent 在该目录自行读代码、改代码、验证；禁止 Task 委派其他模型/子代理；与用户用简体中文沟通
+- `.env` 与 `data/app.sqlite` 仅存服务器本地，禁止 `git add`
