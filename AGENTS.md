@@ -37,10 +37,11 @@
 - 启用后 Telegram 服务会每个刷新周期拉价（不再每 5 轮才刷一次）。
 - **勿将 Bot Token 提交到仓库**；已在聊天中泄露的 Token 建议在 @BotFather 重置。
 
-### 远程服务器开发（smsall）
+### 远程服务器开发（smsall · Docker）
 
 - 主机：`187.127.218.157`，**工作目录仅限** `/opt/smsall`（不要改动 `/opt/xxxtg` 等其他目录）
-- 迁移说明：`docs/migrate-to-xxxtg.md`；安装脚本：`scripts/xxxtg/install-on-server.sh`；密钥打包：`scripts/xxxtg/pack-secrets-for-migrate.sh`
-- 生产进程：`systemd` 单元 `smsbazaar`（`scripts/xxxtg/smsbazaar.service`），监听 `HOST=0.0.0.0` `PORT=8787`
-- Agent 在该目录自行读代码、改代码、验证；禁止 Task 委派其他模型/子代理；与用户用简体中文沟通
-- `.env` 与 `data/app.sqlite` 仅存服务器本地，禁止 `git add`
+- **运行方式：Docker Compose**（`docker-compose.yml` / `Dockerfile`），容器名 `smsall_smsbazaar`，端口 `8787`
+- **禁止**在宿主机为该项目新建 Node/systemd 运行环境；改代码后在 `/opt/smsall` 内 `docker compose build && docker compose up -d`
+- 迁移说明：`docs/migrate-to-xxxtg.md`；安装：`scripts/xxxtg/install-on-server.sh`；密钥：`scripts/xxxtg/pack-secrets-for-migrate.sh`
+- Agent 自行读改验证；禁止 Task 委派其他模型/子代理；与用户用简体中文沟通
+- `.env` 与 `data/app.sqlite` 挂载进容器，禁止 `git add`

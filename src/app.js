@@ -53,6 +53,11 @@ const { sendTelegramMessage, formatInventoryAlertLines } = require('./lib/telegr
 const { isInventoryAlertEnabled } = require('./lib/inventory-alerts');
 const { resolveProviderAccountBalance } = require('./lib/provider-account-balance');
 const {
+  getSiteAuthUser,
+  isPublicApiPath,
+  isSiteAuthDisabled,
+} = require('./lib/site-auth');
+const {
   getGatewayMeta,
   getUnifiedBalance,
   getUnifiedPrices,
@@ -75,6 +80,26 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
   const exposeProviderErrors = String(process.env.EXPOSE_PROVIDER_ERRORS || '').toLowerCase() === 'true';
 
   bootstrapAdminPassword(db);
+
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/api/')) {
+      next();
+      return;
+    }
+    if (isSiteAuthDisabled() || isPublicApiPath(req.path)) {
+      next();
+      return;
+    }
+    const token = extractBearerToken(req);
+    const session = getSession(token);
+    if (!session) {
+      res.status(401).json({ error: 'unauthorized', authenticated: false });
+      return;
+    }
+    req.adminSession = session;
+    req.adminToken = token;
+    next();
+  });
 
   function resolveServiceKey(raw) {
     const key = String(raw || 'openai_chatgpt').trim();
@@ -162,6 +187,8 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       },
       auth: {
         adminConfigured,
+        siteAuthEnabled: !isSiteAuthDisabled(),
+        loginHintUser: isSiteAuthDisabled() ? '' : getSiteAuthUser(),
       },
       recommendationConfig: {
         updatedAt: recommendationConfig.updatedAt,
@@ -262,8 +289,9 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
 
   app.post('/api/auth/login', (req, res) => {
     setNoStore(res);
+    const username = String(req.body?.username || req.body?.user || '');
     const password = String(req.body?.password || '');
-    const result = login(db, password);
+    const result = login(db, password, username);
     if (!result.ok) {
       const status = result.reason === 'admin_password_not_configured' ? 503 : 401;
       res.status(status).json(result);
@@ -277,6 +305,7 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       ok: true,
       token: result.token,
       expiresInMs: result.expiresInMs,
+      username: result.username || getSiteAuthUser(),
     });
   });
 
@@ -300,6 +329,7 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       authenticated: true,
       username: session.username,
       adminConfigured: Boolean(getAdminPasswordRecord(db)),
+      siteAuthEnabled: !isSiteAuthDisabled(),
     });
   });
 

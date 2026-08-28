@@ -3,6 +3,12 @@
 const crypto = require('node:crypto');
 const { listProviders } = require('../config/providers-catalog');
 
+const {
+  getSiteAuthUser,
+  isSiteAuthDisabled,
+  verifySiteCredentials,
+} = require('./site-auth');
+
 const SESSION_TTL_MS = Number(process.env.ADMIN_SESSION_TTL_MS || 12 * 60 * 60 * 1000);
 const sessions = new Map();
 
@@ -188,16 +194,40 @@ function listProviderKeySettings(db) {
   });
 }
 
-function login(db, password) {
+function login(db, password, username = '') {
+  const user = String(username || '').trim();
+  const pass = String(password || '');
+
+  if (!isSiteAuthDisabled()) {
+    if (!verifySiteCredentials(user, pass)) {
+      return { ok: false, reason: 'invalid_credentials' };
+    }
+    const token = createSession(getSiteAuthUser());
+    return {
+      ok: true,
+      token,
+      expiresInMs: SESSION_TTL_MS,
+      username: getSiteAuthUser(),
+    };
+  }
+
+  // Auth disabled (tests/dev): accept configured admin password, or open session.
   const record = getAdminPasswordRecord(db);
-  if (!record?.hash || !record?.salt) {
+  if (record?.hash && record?.salt) {
+    if (!verifyPassword(pass, record.salt, record.hash)) {
+      return { ok: false, reason: 'invalid_credentials' };
+    }
+  } else if (!pass && !user) {
     return { ok: false, reason: 'admin_password_not_configured' };
   }
-  if (!verifyPassword(password, record.salt, record.hash)) {
-    return { ok: false, reason: 'invalid_credentials' };
-  }
-  const token = createSession('admin');
-  return { ok: true, token, expiresInMs: SESSION_TTL_MS };
+
+  const token = createSession(user || getSiteAuthUser() || 'admin');
+  return {
+    ok: true,
+    token,
+    expiresInMs: SESSION_TTL_MS,
+    username: user || getSiteAuthUser() || 'admin',
+  };
 }
 
 const PROVIDER_CONNECTIVITY_KEY = 'provider_connectivity_tests';

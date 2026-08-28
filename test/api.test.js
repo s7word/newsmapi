@@ -119,7 +119,7 @@ describe('API endpoints', () => {
     const { app, db } = setupApp();
     const login = await request(app)
       .post('/api/auth/login')
-      .send({ password: 'test-admin-token' });
+      .send({ username: 'admin', password: 'test-admin-token' });
     expect(login.status).toBe(200);
     expect(login.body.ok).toBe(true);
     expect(login.body.token).toBeTruthy();

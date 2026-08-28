@@ -1,54 +1,46 @@
-# 迁移到服务器 187.127.218.157（`/opt/smsall`）
+# 迁移到服务器 187.127.218.157（`/opt/smsall` · Docker）
 
-目标：把当前 Cloud Agent 上的 SMSBazaar（代码 + `.env` + SQLite 密钥/推送配置）迁到固定服务器，供长期运行与远程开发。
+**工作目录仅限 `/opt/smsall`。用 Docker 运行，不要在宿主机新建 Node/systemd 运行环境。**
 
-**工作目录限制：仅 `/opt/smsall`（不要改动 `/opt/xxxtg` 等其他目录）。**
+## 方式
 
-## 现状盘点（源环境）
-
-| 项 | 说明 |
+| 项 | 值 |
 |---|---|
-| 代码分支 | `cursor/setup-newsmapi-dev-env-cd8d`（已推 GitHub） |
-| 运行端口 | API `8787`，开发前端 `5173` |
-| 密钥 | `.env`（Bot Token、部分 env Key）+ SQLite `provider_api_keys`（24 家平台 Key） |
-| 推送对象 | SQLite `app_settings.telegram_notify_recipients` |
-| 数据库 | `data/app.sqlite`（约 40MB，含快照与告警去重） |
-| 目标路径 | `/opt/smsall` |
-| 目标主机 | `187.127.218.157` |
+| 路径 | `/opt/smsall` |
+| 运行 | `docker compose up -d`（容器 `smsall_smsbazaar`） |
+| 端口 | 宿主 `8787` → 容器 `8787` |
+| 数据 | `./data` 与 `./.env` 挂载进容器（密钥不进镜像） |
 
-**不要把 `.env` / `app.sqlite` 提交进 Git。**
-
-## 前置条件
-
-1. SSH 可用（root 或有 sudo 的部署用户）
-2. 开放 **22** 与 **8787**（若仅内网访问可配防火墙白名单）
-3. 服务器能访问 GitHub
-
-## 一键安装（在服务器上）
+## 服务器安装（仅 Docker）
 
 ```bash
+# 已装 Docker / Compose 的机器上：
 APP_DIR=/opt/smsall bash scripts/xxxtg/install-on-server.sh
+# 写入真实 .env + data/app.sqlite 后：
+cd /opt/smsall && docker compose up -d
 ```
 
-脚本会：安装 Node 22（若无）→ clone/pull 到 `/opt/smsall` → `npm ci` + `npm run build` → 安装 `smsbazaar.service`。
+`install-on-server.sh` **不会**把应用挂到宿主机 Node；若发现误装的 `smsbazaar.service` 会自动拆除。
 
-## 密钥迁移
+## 从 Agent 推密钥并重启容器
 
 ```bash
 bash scripts/xxxtg/pack-secrets-for-migrate.sh
 SSH_USER=root APP_DIR=/opt/smsall bash scripts/xxxtg/push-from-agent.sh
 ```
 
-## 验收
+## 日常
 
 ```bash
-ssh root@187.127.218.157 'systemctl status smsbazaar --no-pager'
-ssh root@187.127.218.157 'curl -s http://127.0.0.1:8787/api/meta | head -c 200'
-# 浏览器：http://187.127.218.157:8787/
+cd /opt/smsall
+docker compose logs -f smsbazaar
+docker compose pull   # 若改用镜像仓库时
+git pull && docker compose build && docker compose up -d
+curl -s http://127.0.0.1:8787/api/meta | head
 ```
 
-## Cursor 远程开发约定
+## 注意
 
-- 工作目录固定：`/opt/smsall`（禁止改其他 `/opt/*` 项目）
-- Agent 自行读改验证；禁止 Task 委派其他模型；与用户用简体中文沟通
-- `.env` 与 `data/app.sqlite` 仅存服务器本地，禁止提交
+- 不要 `apt install nodejs` / 不要用宿主机 `npm start` 跑本项目
+- 不要改 `/opt/xxxtg`、`/opt/scan_xx` 等其他目录
+- `.env` 与 `data/*.sqlite*` 禁止提交 Git

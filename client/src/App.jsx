@@ -48,6 +48,63 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function SiteLoginGate({ onLogin, error }) {
+  const [username, setUsername] = useState('s7word');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [localError, setLocalError] = useState('');
+
+  return (
+    <div className="page-shell site-login-shell">
+      <form
+        className="site-login-card"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setLocalError('');
+          setSubmitting(true);
+          try {
+            await onLogin(username, password);
+          } catch (err) {
+            setLocalError(err.message || '登录失败');
+          } finally {
+            setSubmitting(false);
+          }
+        }}
+      >
+        <p className="eyebrow">SMSBazaar</p>
+        <h1>登录</h1>
+        <p className="site-login-card__hint">访问比价看板与平台设置前请先登录</p>
+        <label>
+          用户名
+          <input
+            type="text"
+            name="username"
+            autoComplete="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            required
+          />
+        </label>
+        <label>
+          密码
+          <input
+            type="password"
+            name="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+        </label>
+        {(localError || error) ? <div className="error-banner">{localError || error}</div> : null}
+        <button type="submit" className="primary-button" disabled={submitting}>
+          {submitting ? '登录中…' : '登录'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function buildCompareUrl(filters, summary = false) {
   const params = new URLSearchParams(filters);
   if (summary) params.set('summary', '1');
@@ -778,23 +835,36 @@ function SettingsModal({
               onSubmit={async (event) => {
                 event.preventDefault();
                 setLoginError('');
-                const formPassword = String(new FormData(event.currentTarget).get('password') || password || '');
+                const form = new FormData(event.currentTarget);
+                const formUser = String(form.get('username') || '');
+                const formPassword = String(form.get('password') || password || '');
                 try {
-                  await onLogin(formPassword);
+                  await onLogin(formUser, formPassword);
                 } catch (error) {
                   setLoginError(error.message || '登录失败');
                 }
               }}
             >
               <label>
-                管理员密码
+                用户名
+                <input
+                  type="text"
+                  name="username"
+                  defaultValue="s7word"
+                  autoComplete="username"
+                  required
+                />
+              </label>
+              <label>
+                密码
                 <input
                   type="password"
                   name="password"
                   value={password}
                   autoComplete="current-password"
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="ADMIN_PASSWORD / ADMIN_REFRESH_TOKEN"
+                  placeholder="登录密码"
+                  required
                 />
               </label>
               {loginError ? <div className="error-banner">{loginError}</div> : null}
@@ -965,6 +1035,7 @@ function App() {
   const [detailLoading, setDetailLoading] = useState({});
   const [detailErrors, setDetailErrors] = useState({});
   const skippedInitialFilterLoad = useRef(false);
+  const skippedInitialServiceLoad = useRef(false);
   const detailsGeneration = useRef(0);
   const [filters, setFilters] = useState({
     service: 'openai_chatgpt',
@@ -980,7 +1051,9 @@ function App() {
   const [telegramLoading, setTelegramLoading] = useState(false);
   const [telegramTestingId, setTelegramTestingId] = useState('');
   const [telegramMessage, setTelegramMessage] = useState(null);
-  const [authenticated, setAuthenticated] = useState(Boolean(getAuthToken()));
+  const [authenticated, setAuthenticated] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [authUser, setAuthUser] = useState('');
   const [keyProviders, setKeyProviders] = useState([]);
   const [panelProviders, setPanelProviders] = useState([]);
   const [panelLoading, setPanelLoading] = useState(false);
@@ -1077,11 +1150,34 @@ function App() {
       try {
         setLoading(true);
         setError('');
+
+        const meResponse = await fetch('/api/auth/me', { headers: authHeaders() });
+        const mePayload = await meResponse.json().catch(() => ({ authenticated: false }));
+        if (cancelled) return;
+
+        if (!meResponse.ok || !mePayload.authenticated) {
+          setAuthenticated(false);
+          setAuthToken('');
+          setAuthUser('');
+          setAuthReady(true);
+          setLoading(false);
+          return;
+        }
+
+        setAuthenticated(true);
+        setAuthUser(mePayload.username || '');
+        setAuthReady(true);
+
         const [metaResponse, compareResponse] = await Promise.all([
-          fetch(`/api/meta?service=${encodeURIComponent(filters.service)}`),
-          fetch(buildCompareUrl(filters, true)),
+          fetch(`/api/meta?service=${encodeURIComponent(filters.service)}`, { headers: authHeaders() }),
+          fetch(buildCompareUrl(filters, true), { headers: authHeaders() }),
         ]);
         if (!metaResponse.ok || !compareResponse.ok) {
+          if (metaResponse.status === 401 || compareResponse.status === 401) {
+            setAuthenticated(false);
+            setAuthToken('');
+            return;
+          }
           throw new Error('初始化加载失败');
         }
         const [metaPayload, comparePayload] = await Promise.all([
@@ -1091,17 +1187,18 @@ function App() {
         if (cancelled) return;
         setMeta(metaPayload);
         setCompare(comparePayload);
-        if (getAuthToken()) {
-          try {
-            await loadProvidersPanel({ silent: true });
-          } catch {
-            setAuthenticated(false);
-          }
+        try {
+          await loadProvidersPanel({ silent: true });
+        } catch {
+          // panel is optional on first paint
         }
       } catch (bootstrapError) {
         if (!cancelled) setError(bootstrapError.message);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setAuthReady(true);
+          setLoading(false);
+        }
       }
     }
 
@@ -1118,7 +1215,7 @@ function App() {
   }, [settingsOpen, authenticated, filters.service]);
 
   useEffect(() => {
-    if (!meta) return;
+    if (!authenticated || !meta) return;
     if (!skippedInitialFilterLoad.current) {
       skippedInitialFilterLoad.current = true;
       return;
@@ -1135,7 +1232,12 @@ function App() {
     async function refreshCompare() {
       try {
         setError('');
-        const response = await fetch(buildCompareUrl(filters, true));
+        const response = await fetch(buildCompareUrl(filters, true), { headers: authHeaders() });
+        if (response.status === 401) {
+          setAuthenticated(false);
+          setAuthToken('');
+          return;
+        }
         if (!response.ok) throw new Error('筛选刷新失败');
         const payload = await response.json();
         if (!cancelled) setCompare(payload);
@@ -1147,11 +1249,14 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [filters.mode, filters.country, filters.provider, filters.status, filters.sort, meta]);
+  }, [filters.mode, filters.country, filters.provider, filters.status, filters.sort, meta, authenticated]);
 
   useEffect(() => {
-    if (!meta) return;
-    if (!skippedInitialFilterLoad.current) return;
+    if (!authenticated || !meta) return;
+    if (!skippedInitialServiceLoad.current) {
+      skippedInitialServiceLoad.current = true;
+      return;
+    }
 
     let cancelled = false;
     detailsGeneration.current += 1;
@@ -1165,10 +1270,15 @@ function App() {
       try {
         setError('');
         const [metaResponse, compareResponse] = await Promise.all([
-          fetch(`/api/meta?service=${encodeURIComponent(filters.service)}`),
-          fetch(buildCompareUrl(filters, true)),
+          fetch(`/api/meta?service=${encodeURIComponent(filters.service)}`, { headers: authHeaders() }),
+          fetch(buildCompareUrl(filters, true), { headers: authHeaders() }),
         ]);
-        if (!metaResponse.ok || !compareResponse.ok) throw new Error('服务切换失败');
+        if (metaResponse.status === 401 || compareResponse.status === 401) {
+          setAuthenticated(false);
+          setAuthToken('');
+          return;
+        }
+        if (!metaResponse.ok || !compareResponse.ok) throw new Error('切换服务失败');
         const [metaPayload, comparePayload] = await Promise.all([
           metaResponse.json(),
           compareResponse.json(),
@@ -1184,7 +1294,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [filters.service]);
+  }, [filters.service, authenticated]);
 
   async function toggleCountry(row) {
     const countryIso2 = row.countryIso2;
@@ -1205,7 +1315,7 @@ function App() {
     setDetailErrors((current) => ({ ...current, [countryIso2]: '' }));
 
     try {
-      const response = await fetch(buildCompareUrl({ ...filters, country: countryIso2 }));
+      const response = await fetch(buildCompareUrl({ ...filters, country: countryIso2 }), { headers: authHeaders() });
       if (!response.ok) throw new Error('加载平台明细失败');
       const payload = await response.json();
       if (requestGeneration !== detailsGeneration.current) return;
@@ -1224,21 +1334,41 @@ function App() {
     }
   }
 
-  async function handleLogin(password) {
+  async function handleLogin(username, password) {
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ username, password }),
     });
     const payload = await response.json();
     if (!response.ok || !payload.ok) {
-      throw new Error(payload.reason === 'admin_password_not_configured'
-        ? '未配置管理员密码，请先在环境变量设置 ADMIN_PASSWORD'
-        : '密码错误');
+      throw new Error(payload.reason === 'invalid_credentials'
+        ? '用户名或密码错误'
+        : (payload.reason === 'admin_password_not_configured'
+          ? '未配置登录凭据'
+          : '登录失败'));
     }
     setAuthToken(payload.token);
     setAuthenticated(true);
-    await loadProvidersPanel();
+    setAuthUser(payload.username || username);
+    setAuthReady(true);
+    setLoading(true);
+    try {
+      const [metaResponse, compareResponse] = await Promise.all([
+        fetch(`/api/meta?service=${encodeURIComponent(filters.service)}`, { headers: { Authorization: `Bearer ${payload.token}` } }),
+        fetch(buildCompareUrl(filters, true), { headers: { Authorization: `Bearer ${payload.token}` } }),
+      ]);
+      if (!metaResponse.ok || !compareResponse.ok) throw new Error('登录后加载数据失败');
+      const [metaPayload, comparePayload] = await Promise.all([
+        metaResponse.json(),
+        compareResponse.json(),
+      ]);
+      setMeta(metaPayload);
+      setCompare(comparePayload);
+      await loadProvidersPanel();
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleLogout() {
@@ -1248,9 +1378,13 @@ function App() {
     });
     setAuthToken('');
     setAuthenticated(false);
+    setAuthUser('');
+    setMeta(null);
+    setCompare({ rows: [], updatedAt: '' });
     setKeyProviders([]);
     setPanelProviders([]);
     setSettingsMessage('');
+    setSettingsOpen(false);
   }
 
   async function handleTestKey(keyEnv, apiKey) {
@@ -1289,9 +1423,14 @@ function App() {
 
   async function reloadDashboardData() {
     const [metaResponse, compareResponse] = await Promise.all([
-      fetch(`/api/meta?service=${encodeURIComponent(filters.service)}`),
-      fetch(buildCompareUrl(filters, true)),
+      fetch(`/api/meta?service=${encodeURIComponent(filters.service)}`, { headers: authHeaders() }),
+      fetch(buildCompareUrl(filters, true), { headers: authHeaders() }),
     ]);
+    if (metaResponse.status === 401 || compareResponse.status === 401) {
+      setAuthenticated(false);
+      setAuthToken('');
+      throw new Error('会话已过期，请重新登录');
+    }
     if (!metaResponse.ok || !compareResponse.ok) {
       throw new Error('加载最新报价失败');
     }
@@ -1485,7 +1624,15 @@ function App() {
 
   const themeTitle = `主题：${THEME_LABELS[themePreference]}，点击切换`;
 
-  if (loading) {
+  if (!authReady || (authenticated && loading && !meta)) {
+    return <div className="page-shell"><div className="loading-card">正在加载…</div></div>;
+  }
+
+  if (!authenticated) {
+    return <SiteLoginGate onLogin={handleLogin} />;
+  }
+
+  if (loading && !meta) {
     return <div className="page-shell"><div className="loading-card">正在加载价格快照...</div></div>;
   }
 
@@ -1520,18 +1667,17 @@ function App() {
         <div>
           <p className="eyebrow">Multi-service · Multi-provider SMS price board</p>
           <h1>{meta?.service?.displayName || '短信'} 价格对比</h1>
+          {authUser ? <p className="site-login-user">已登录：{authUser}</p> : null}
         </div>
         <div className="hero-meta">
-          {authenticated ? (
-            <button
-              type="button"
-              className="hero-refresh-button"
-              disabled={refreshingService}
-              onClick={() => handleRefreshCurrentService()}
-            >
-              {refreshingService ? '刷新中…' : '刷新当前服务'}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="hero-refresh-button"
+            disabled={refreshingService}
+            onClick={() => handleRefreshCurrentService()}
+          >
+            {refreshingService ? '刷新中…' : '刷新当前服务'}
+          </button>
           <button
             type="button"
             className="hero-refresh-button"
@@ -1539,6 +1685,14 @@ function App() {
             onClick={() => openSettingsModal('telegram')}
           >
             📣 Telegram 推送
+          </button>
+          <button
+            type="button"
+            className="hero-refresh-button"
+            title="退出登录"
+            onClick={() => handleLogout()}
+          >
+            退出
           </button>
           <div className="hero-badge">
             <span>国家</span>
