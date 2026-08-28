@@ -52,5 +52,5 @@ Packed (private — do not commit / do not paste into chat):
 
 Upload example (after SSH works):
   scp ${ARCHIVE} root@187.127.218.157:/tmp/
-  ssh root@187.127.218.157 'mkdir -p /opt/xxxtg && tar -xzf /tmp/$(basename "${ARCHIVE}") -C /opt/xxxtg && systemctl restart smsbazaar'
+  ssh root@187.127.218.157 'tar -xzf /tmp/$(basename "${ARCHIVE}") -C /opt/smsall && cd /opt/smsall && docker compose up -d --force-recreate'
 EOF
