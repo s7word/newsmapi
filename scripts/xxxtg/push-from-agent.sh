@@ -5,7 +5,7 @@ set -euo pipefail
 
 HOST="${HOST:-187.127.218.157}"
 USER="${SSH_USER:-root}"
-APP_DIR="${APP_DIR:-/opt/xxxtg}"
+APP_DIR="${APP_DIR:-/opt/smsall}"
 BRANCH="${BRANCH:-cursor/setup-newsmapi-dev-env-cd8d}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 

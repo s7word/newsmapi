@@ -4,7 +4,7 @@
 # builds frontend, and installs systemd unit.
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/opt/xxxtg}"
+APP_DIR="${APP_DIR:-/opt/smsall}"
 REPO_URL="${REPO_URL:-https://github.com/s7word/newsmapi.git}"
 BRANCH="${BRANCH:-cursor/setup-newsmapi-dev-env-cd8d}"
 NODE_MAJOR="${NODE_MAJOR:-22}"

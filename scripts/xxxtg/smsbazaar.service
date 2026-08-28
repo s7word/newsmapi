@@ -6,11 +6,11 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/xxxtg
+WorkingDirectory=/opt/smsall
 Environment=NODE_ENV=production
 Environment=HOST=0.0.0.0
-EnvironmentFile=-/opt/xxxtg/.env
-ExecStart=/usr/bin/node /opt/xxxtg/src/server.js
+EnvironmentFile=-/opt/smsall/.env
+ExecStart=/usr/bin/node /opt/smsall/src/server.js
 Restart=always
 RestartSec=5
 # SQLite + long OpenAI refresh cycles can be memory-heavy
