@@ -37,9 +37,9 @@
 - 启用后 Telegram 服务会每个刷新周期拉价（不再每 5 轮才刷一次）。
 - **勿将 Bot Token 提交到仓库**；已在聊天中泄露的 Token 建议在 @BotFather 重置。
 
-### 远程服务器开发（xxxtg）
+### 远程服务器开发（smsall）
 
-- 主机：`187.127.218.157`，工作目录：`/opt/xxxtg`
+- 主机：`187.127.218.157`，**工作目录仅限** `/opt/smsall`（不要改动 `/opt/xxxtg` 等其他目录）
 - 迁移说明：`docs/migrate-to-xxxtg.md`；安装脚本：`scripts/xxxtg/install-on-server.sh`；密钥打包：`scripts/xxxtg/pack-secrets-for-migrate.sh`
 - 生产进程：`systemd` 单元 `smsbazaar`（`scripts/xxxtg/smsbazaar.service`），监听 `HOST=0.0.0.0` `PORT=8787`
 - Agent 在该目录自行读代码、改代码、验证；禁止 Task 委派其他模型/子代理；与用户用简体中文沟通
