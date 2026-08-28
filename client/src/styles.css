@@ -993,6 +993,12 @@ button.project-link {
   margin: 0;
 }
 
+.webhook-filters__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .webhook-filter-types {
   display: flex;
   flex-wrap: wrap;

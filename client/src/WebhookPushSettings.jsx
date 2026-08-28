@@ -14,7 +14,7 @@ export default function WebhookPushSettings({
   const providerCatalog = webhookConfig?.providerCatalog || [];
   const [enabled, setEnabled] = useState(Boolean(webhook.enabled));
   const [url, setUrl] = useState(webhook.url || '');
-  const [secret, setSecret] = useState(webhook.secret || '');
+  const [secret, setSecret] = useState('');
   const [maxPriceUsd, setMaxPriceUsd] = useState(
     filters.maxPriceUsd == null ? '' : String(filters.maxPriceUsd),
   );
@@ -34,13 +34,14 @@ export default function WebhookPushSettings({
     Array.isArray(filters.providerKeys) ? filters.providerKeys : [],
   );
   const [providerQuery, setProviderQuery] = useState('');
+  const [localMessage, setLocalMessage] = useState(null);
 
   useEffect(() => {
     const next = webhookConfig?.webhook || {};
     const nextFilters = next.filters || {};
     setEnabled(Boolean(next.enabled));
     setUrl(next.url || '');
-    setSecret(next.secret || '');
+    setSecret('');
     setMaxPriceUsd(nextFilters.maxPriceUsd == null ? '' : String(nextFilters.maxPriceUsd));
     setRequireBalance(Boolean(nextFilters.requireBalance));
     setMinBalance(nextFilters.minBalance == null ? '' : String(nextFilters.minBalance));
@@ -57,15 +58,23 @@ export default function WebhookPushSettings({
     return `${row.alertCode} ${row.displayName} ${row.providerKey}`.toLowerCase().includes(query);
   });
 
+  const ready = Boolean(enabled && String(url || '').trim());
+  const displayMessage = localMessage || message;
+
   async function handleSave(event) {
     event.preventDefault();
+    setLocalMessage(null);
     const alertTypes = [];
     if (typeNew) alertTypes.push('new_listing');
     if (typeRestock) alertTypes.push('restock');
+    if (enabled && !String(url || '').trim()) {
+      setLocalMessage({ ok: false, text: '勾选启用后必须填写 Webhook URL' });
+      return;
+    }
     await onSave({
       enabled,
-      url,
-      secret,
+      url: String(url || '').trim(),
+      secret: secret || '********',
       filters: {
         maxPriceUsd: maxPriceUsd === '' ? null : Number(maxPriceUsd),
         requireBalance,
@@ -75,6 +84,19 @@ export default function WebhookPushSettings({
         maxItemsPerPush: Number(maxItems) || 50,
       },
     });
+  }
+
+  async function handleTestClick() {
+    setLocalMessage(null);
+    const trimmed = String(url || '').trim();
+    if (!trimmed) {
+      setLocalMessage({
+        ok: false,
+        text: '请先填写 Webhook URL。当前服务器上过滤条件已保存，但 URL 为空，所以测试发不出去。',
+      });
+      return;
+    }
+    await onTest({ url: trimmed, secret: secret || '********' });
   }
 
   return (
@@ -87,13 +109,32 @@ export default function WebhookPushSettings({
           （schema：{webhookConfig?.schema || 'smsall.alert.v1'}）。
         </p>
         <div className="telegram-push-settings__status">
+          <span className={ready ? 'provider-settings-badge provider-settings-badge--ok' : 'provider-settings-badge provider-settings-badge--muted'}>
+            {ready ? 'Webhook 已就绪' : 'Webhook 未就绪'}
+          </span>
           <span className={enabled ? 'provider-settings-badge provider-settings-badge--ok' : 'provider-settings-badge provider-settings-badge--muted'}>
-            {enabled ? 'Webhook 已启用' : 'Webhook 未启用'}
+            {enabled ? '已启用' : '未启用'}
           </span>
           <span className="provider-settings-badge provider-settings-badge--muted">
             {webhook.secretConfigured ? '已配置 Secret' : '未配置 Secret'}
           </span>
+          {filters.minBalance != null ? (
+            <span className="provider-settings-badge provider-settings-badge--ok">
+              最低余额 ≥ {filters.minBalance}
+            </span>
+          ) : null}
+          {filters.maxPriceUsd != null ? (
+            <span className="provider-settings-badge provider-settings-badge--ok">
+              最高单价 ≤ ${filters.maxPriceUsd}
+            </span>
+          ) : null}
         </div>
+        {!ready ? (
+          <div className="error-banner">
+            过滤条件可以先保存，但必须同时「勾选启用 + 填写可达的 Webhook URL」后才会真正推送。
+            Docker 内不要用 127.0.0.1 指宿主机程序，请用宿主机 IP 或 http://172.17.0.1:端口/...
+          </div>
+        ) : null}
       </div>
 
       <form className="webhook-settings-form" onSubmit={handleSave}>
@@ -109,10 +150,10 @@ export default function WebhookPushSettings({
         <label>
           Webhook URL
           <input
-            type="url"
+            type="text"
             value={url}
             onChange={(event) => setUrl(event.target.value)}
-            placeholder="https://your-app.example/hooks/smsall"
+            placeholder="http://172.17.0.1:9090/hooks/smsall"
             required={enabled}
           />
         </label>
@@ -123,13 +164,16 @@ export default function WebhookPushSettings({
             type="password"
             value={secret}
             onChange={(event) => setSecret(event.target.value)}
-            placeholder={webhook.secretConfigured ? '已保存；填 ******** 或不改可保留原值' : '可选共享密钥'}
+            placeholder={webhook.secretConfigured ? '已保存，留空表示不修改' : '可选共享密钥'}
             autoComplete="new-password"
           />
         </label>
 
         <div className="webhook-filters">
           <h4>简化 / 过滤规则</h4>
+          <p className="webhook-filters__hint">
+            过滤只作用于程序推送，不影响 Telegram。最低余额会丢弃余额未知或低于阈值的平台。
+          </p>
           <label>
             最高单价 USD（只要低价；空=不限）
             <input
@@ -222,8 +266,11 @@ export default function WebhookPushSettings({
           ) : null}
         </div>
 
-        {message ? (
-          <div className={message.ok ? 'success-banner' : 'error-banner'}>{message.text}</div>
+        {displayMessage ? (
+          <div className={displayMessage.ok ? 'success-banner' : 'error-banner'}>
+            {displayMessage.text}
+            {displayMessage.hint ? <div>{displayMessage.hint}</div> : null}
+          </div>
         ) : null}
 
         <div className="settings-actions">
@@ -233,8 +280,8 @@ export default function WebhookPushSettings({
           <button
             type="button"
             className="ghost-button"
-            disabled={testing || !url}
-            onClick={() => onTest({ url, secret })}
+            disabled={testing}
+            onClick={handleTestClick}
           >
             {testing ? '测试中…' : '发送测试'}
           </button>

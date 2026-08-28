@@ -1653,9 +1653,16 @@ function App() {
         body: JSON.stringify(patch),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || '保存失败');
+      if (!response.ok) {
+        throw new Error(payload.message || payload.error || '保存失败');
+      }
       setWebhookConfig(payload);
-      setWebhookMessage({ ok: true, text: '程序推送设置已保存' });
+      setWebhookMessage({
+        ok: true,
+        text: payload.ready
+          ? '程序推送设置已保存，已就绪'
+          : (payload.warning || '程序推送设置已保存（尚未就绪）'),
+      });
     } catch (error) {
       setWebhookMessage({ ok: false, text: error.message || '保存失败' });
       throw error;
@@ -1675,11 +1682,12 @@ function App() {
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.result?.error || payload.error || '测试推送失败');
+        throw new Error(payload.message || payload.result?.error || payload.error || '测试推送失败');
       }
       setWebhookMessage({
         ok: true,
-        text: `测试已发送（HTTP ${payload.result?.status || 200}）`,
+        text: payload.message || `测试已发送（HTTP ${payload.result?.status || 200}）`,
+        hint: payload.hint || '',
       });
     } catch (error) {
       setWebhookMessage({ ok: false, text: error.message || '测试推送失败' });

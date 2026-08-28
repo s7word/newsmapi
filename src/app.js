@@ -463,20 +463,36 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
   app.put('/api/settings/webhook', requireAdmin(db), (req, res) => {
     setNoStore(res);
     try {
+      const current = getAlertWebhookConfig(db);
+      let nextSecret = req.body?.secret;
+      if (nextSecret == null || nextSecret === '' || nextSecret === '********') {
+        nextSecret = current.secret;
+      }
       const saved = saveAlertWebhookConfig(db, {
         enabled: req.body?.enabled,
         url: req.body?.url,
-        secret: req.body?.secret === '********'
-          ? getAlertWebhookConfig(db).secret
-          : req.body?.secret,
+        secret: nextSecret,
         timeoutMs: req.body?.timeoutMs,
         filters: req.body?.filters,
       });
       if (saved.enabled && !saved.url) {
-        res.status(400).json({ ok: false, error: 'url_required' });
+        res.status(400).json({
+          ok: false,
+          error: 'url_required',
+          message: '已勾选启用，但 Webhook URL 为空',
+        });
         return;
       }
-      res.json({ ok: true, webhook: publicWebhookConfig(saved) });
+      res.json({
+        ok: true,
+        webhook: publicWebhookConfig(saved),
+        schema: 'smsall.alert.v1',
+        providerCatalog: listProviderAlertCatalog(),
+        ready: Boolean(saved.enabled && saved.url),
+        warning: (!saved.enabled || !saved.url)
+          ? '过滤条件已保存，但需勾选「启用程序推送」并填写 Webhook URL 后才会真正推送'
+          : '',
+      });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message || 'save_failed' });
     }
@@ -487,8 +503,17 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
     const config = getAlertWebhookConfig(db);
     const url = String(req.body?.url || config.url || '').trim();
     if (!url) {
-      res.status(400).json({ ok: false, error: 'url_required' });
+      res.status(400).json({
+        ok: false,
+        error: 'url_required',
+        message: '请先填写 Webhook URL（并建议先点保存）',
+      });
       return;
+    }
+
+    let secret = req.body?.secret;
+    if (secret == null || secret === '' || secret === '********') {
+      secret = config.secret;
     }
 
     const samplePayload = buildWebhookPayload({
@@ -517,17 +542,23 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
         ...config,
         enabled: true,
         url,
-        secret: req.body?.secret === '********' || req.body?.secret == null
-          ? config.secret
-          : String(req.body.secret || ''),
+        secret: String(secret || ''),
       },
       payload: samplePayload,
     });
+
+    const hint = /127\.0\.0\.1|localhost/i.test(url)
+      ? '提示：SMSBazaar 跑在 Docker 里时，127.0.0.1 指向容器自身。接收程序若在宿主机，请用宿主机局域网 IP 或 http://172.17.0.1:<端口>/...'
+      : '';
 
     res.status(result.ok ? 200 : 502).json({
       ok: Boolean(result.ok),
       result,
       sample: samplePayload,
+      message: result.ok
+        ? `测试已发送（HTTP ${result.status}）`
+        : (result.error || '测试推送失败'),
+      hint,
     });
   });
 

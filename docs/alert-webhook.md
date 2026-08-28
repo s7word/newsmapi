@@ -128,7 +128,7 @@ app.post('/hooks/smsall', express.raw({ type: 'application/json' }), (req, res) 
 app.listen(9090);
 ```
 
-前端 Webhook URL 填：`http://<你的程序主机>:9090/hooks/smsall`
+若接收程序与 SMSBazaar 在同一台机器：SMSBazaar 在 Docker 内，`http://127.0.0.1:...` 会打到容器自己。请改用宿主机 IP，或 Docker 网桥网关（常见为 `http://172.17.0.1:<端口>/hooks/smsall`）。
 
 ## 测试
 
