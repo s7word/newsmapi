@@ -58,6 +58,7 @@ const {
   isSiteAuthDisabled,
 } = require('./lib/site-auth');
 const {
+  filterEventsForWebhook,
   getAlertWebhookConfig,
   postAlertWebhook,
   publicWebhookConfig,
@@ -516,26 +517,44 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       secret = config.secret;
     }
 
+    // Synthetic probe only — not real inventory. Price/balance match a typical SMSTG public quote
+    // and then pass through the same filters as production webhooks.
+    const sampleEvent = {
+      type: 'restock',
+      providerKey: 'smstg',
+      providerName: 'SMSTG',
+      countryIso2: 'IN',
+      countryName: 'India',
+      previousStock: 0,
+      newStock: 1,
+      minPriceUsd: 0.2,
+      currency: 'USD',
+    };
+    const sampleBalance = { balance: '0', currency: 'USD', ok: true };
+    const filtered = filterEventsForWebhook([sampleEvent], config, sampleBalance);
+    if (!filtered.length) {
+      res.status(200).json({
+        ok: false,
+        skipped: true,
+        error: 'filtered_out',
+        message: '测试样例被当前过滤规则拦截（例如最低余额/最高单价/无余额平台），因此不会发出 HTTP 请求。这是预期行为，不是故障。',
+        sampleEvent,
+        sampleBalance,
+        filters: config.filters,
+      });
+      return;
+    }
+
     const samplePayload = buildWebhookPayload({
       serviceKey: 'telegram',
       serviceLabel: 'Telegram 接码',
       providerKey: 'smstg',
       providerName: 'SMSTG',
-      accountBalance: { balance: '12.50', currency: 'USD' },
-      events: [
-        {
-          type: 'restock',
-          providerKey: 'smstg',
-          providerName: 'SMSTG',
-          countryIso2: 'IN',
-          countryName: 'India',
-          previousStock: 0,
-          newStock: 18,
-          minPriceUsd: 0.12,
-          currency: 'USD',
-        },
-      ],
+      accountBalance: sampleBalance,
+      events: filtered,
     });
+    samplePayload.test = true;
+    samplePayload.note = '这是设置页「发送测试」的模拟数据，不是真实补货。';
 
     const result = await postAlertWebhook({
       config: {
@@ -556,7 +575,7 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       result,
       sample: samplePayload,
       message: result.ok
-        ? `测试已发送（HTTP ${result.status}）`
+        ? `测试已发送（HTTP ${result.status}）。这是模拟数据，价格/余额不等于实时平台。`
         : (result.error || '测试推送失败'),
       hint,
     });

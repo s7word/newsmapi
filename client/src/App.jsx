@@ -1681,6 +1681,13 @@ function App() {
         body: JSON.stringify({ url, secret }),
       });
       const payload = await response.json();
+      if (payload.skipped && payload.error === 'filtered_out') {
+        setWebhookMessage({
+          ok: true,
+          text: payload.message || '测试样例被过滤规则拦截（未发 HTTP）',
+        });
+        return;
+      }
       if (!response.ok || !payload.ok) {
         throw new Error(payload.message || payload.result?.error || payload.error || '测试推送失败');
       }

@@ -172,7 +172,8 @@ export default function WebhookPushSettings({
         <div className="webhook-filters">
           <h4>简化 / 过滤规则</h4>
           <p className="webhook-filters__hint">
-            过滤只作用于程序推送，不影响 Telegram。最低余额会丢弃余额未知或低于阈值的平台。
+            这些过滤<strong>只作用于程序推送（Webhook）</strong>，不影响 Telegram 机器人原文。
+            最低余额会丢弃余额未知或低于阈值的平台。SMSTG 若 Key 无效导致余额未知，Webhook 不会推它，但 Telegram 仍可能推送。
           </p>
           <label>
             最高单价 USD（只要低价；空=不限）
