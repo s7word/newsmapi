@@ -231,6 +231,12 @@ async function fetchProviderOffers({ mapping, exchangeRateService, apiKey }) {
       },
     });
 
+    offer.countryIso2 = '';
+    offer.countryName = '全球统一价';
+    offer.countryNameEn = 'Global flat rate';
+    offer.countryNameZh = '全球统一价';
+    offer.countryDisplayName = '全球统一价';
+
     return {
       providerKey,
       providerName,
