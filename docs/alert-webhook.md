@@ -66,7 +66,9 @@ SMSBazaar 在检测到 **Telegram 服务**补货 / 新上架后，除了发 Tele
 }
 ```
 
-`items` **已按单价从低到高排序**。
+`items` **优先按通知时间从新到旧，其次按单价从低到高**。单次条数上限截断时同样优先最新。
+
+载荷可含 `source`：`auto`（自动刷新）或 `manual_latest`（设置页「手动推送最新」）。
 
 ### 字段说明
 
@@ -97,10 +99,21 @@ SMSBazaar 在检测到 **Telegram 服务**补货 / 新上架后，除了发 Tele
 3. **最低余额**：例如只推余额 ≥ 1 的平台
 4. **事件类型**：新上架 / 补货 可分别开关
 5. **平台白名单**：不选=全部；勾选后只推这些平台
-6. **单次最多条数**：默认 50
+6. **单次最多条数**：默认 50；超出时**优先保留最新通知**（其次低价）
+7. **手动推送最新**：设置页按钮，把最近 N 分钟告警日志中通过过滤的条目合并成一次推送（`source: "manual_latest"`），避免自动推送堆积时程序拿不到最新
 
 过滤只影响 Webhook，**不影响** Telegram 原文推送。
 
+### 手动推送最新
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/api/settings/webhook/push-latest \
+  -H "Authorization: Bearer <登录token>" \
+  -H "Content-Type: application/json" \
+  -d '{"lookbackMinutes":60,"serviceKey":"telegram"}'
+```
+
+请求体字段 `source` 为 `manual_latest`，并带 `manual: true`。
 ## 最小接收示例（Node）
 
 ```js

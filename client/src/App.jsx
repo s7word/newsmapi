@@ -774,8 +774,10 @@ function SettingsModal({
   webhookLoading,
   onSaveWebhook,
   onTestWebhook,
+  onPushLatestWebhook,
   webhookSaving,
   webhookTesting,
+  webhookPushingLatest,
   webhookMessage,
 }) {
   const [password, setPassword] = useState('');
@@ -934,8 +936,10 @@ function SettingsModal({
                   loading={webhookLoading}
                   onSave={onSaveWebhook}
                   onTest={onTestWebhook}
+                  onPushLatest={onPushLatestWebhook}
                   saving={webhookSaving}
                   testing={webhookTesting}
+                  pushingLatest={webhookPushingLatest}
                   message={webhookMessage}
                 />
               ) : (
@@ -1083,6 +1087,7 @@ function App() {
   const [webhookLoading, setWebhookLoading] = useState(false);
   const [webhookSaving, setWebhookSaving] = useState(false);
   const [webhookTesting, setWebhookTesting] = useState(false);
+  const [webhookPushingLatest, setWebhookPushingLatest] = useState(false);
   const [webhookMessage, setWebhookMessage] = useState(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [authReady, setAuthReady] = useState(false);
@@ -1703,6 +1708,49 @@ function App() {
     }
   }
 
+  async function handlePushLatestWebhook({ lookbackMinutes = 60 } = {}) {
+    setWebhookMessage(null);
+    setWebhookPushingLatest(true);
+    try {
+      const response = await fetch('/api/settings/webhook/push-latest', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lookbackMinutes, serviceKey: 'telegram' }),
+      });
+      const payload = await response.json();
+      if (payload.status) {
+        setWebhookConfig((current) => ({
+          ...(current || {}),
+          status: payload.status,
+        }));
+      }
+      if (payload.skipped) {
+        setWebhookMessage({
+          ok: false,
+          text: payload.message || payload.error || '没有可推送的最新通知',
+        });
+        return;
+      }
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || payload.result?.error || payload.error || '手动推送失败');
+      }
+      const previewCountries = (payload.preview || [])
+        .map((item) => `${item.country || '?'} $${item.priceUsd ?? '-'}`)
+        .slice(0, 4)
+        .join(' · ');
+      setWebhookMessage({
+        ok: true,
+        text: payload.message || `已手动推送最新 ${payload.result?.itemCount || 0} 条`,
+        hint: previewCountries ? `预览：${previewCountries}` : '',
+      });
+      await loadWebhookSettings({ silent: true });
+    } catch (error) {
+      setWebhookMessage({ ok: false, text: error.message || '手动推送失败' });
+    } finally {
+      setWebhookPushingLatest(false);
+    }
+  }
+
   const providerOptions = useMemo(() => (meta?.providers || []).map((provider) => ({
     value: provider.providerKey,
     label: provider.displayName,
@@ -2072,8 +2120,10 @@ function App() {
         webhookLoading={webhookLoading}
         onSaveWebhook={handleSaveWebhook}
         onTestWebhook={handleTestWebhook}
+        onPushLatestWebhook={handlePushLatestWebhook}
         webhookSaving={webhookSaving}
         webhookTesting={webhookTesting}
+        webhookPushingLatest={webhookPushingLatest}
         webhookMessage={webhookMessage}
       />
     </div>

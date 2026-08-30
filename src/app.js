@@ -60,8 +60,10 @@ const {
 const {
   filterEventsForWebhook,
   getAlertWebhookConfig,
+  getAlertWebhookStatus,
   postAlertWebhook,
   publicWebhookConfig,
+  pushLatestAlertWebhook,
   saveAlertWebhookConfig,
   buildWebhookPayload,
 } = require('./lib/alert-webhook');
@@ -452,9 +454,11 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
   app.get('/api/settings/webhook', requireAdmin(db), (req, res) => {
     setNoStore(res);
     const config = getAlertWebhookConfig(db);
+    const status = getAlertWebhookStatus(db);
     res.json({
       ok: true,
       webhook: publicWebhookConfig(config),
+      status,
       docsPath: '/docs/alert-webhook.md',
       schema: 'smsall.alert.v1',
       providerCatalog: listProviderAlertCatalog(),
@@ -487,6 +491,7 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
       res.json({
         ok: true,
         webhook: publicWebhookConfig(saved),
+        status: getAlertWebhookStatus(db),
         schema: 'smsall.alert.v1',
         providerCatalog: listProviderAlertCatalog(),
         ready: Boolean(saved.enabled && saved.url),
@@ -579,6 +584,66 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
         : (result.error || '测试推送失败'),
       hint,
     });
+  });
+
+  app.post('/api/settings/webhook/push-latest', requireAdmin(db), async (req, res) => {
+    setNoStore(res);
+    const config = getAlertWebhookConfig(db);
+    if (!config.url) {
+      res.status(400).json({
+        ok: false,
+        error: 'url_missing',
+        message: '请先配置并保存 Webhook URL',
+      });
+      return;
+    }
+
+    const lookbackRaw = Number(req.body?.lookbackMinutes);
+    const lookbackMinutes = Number.isFinite(lookbackRaw) && lookbackRaw > 0
+      ? Math.min(Math.floor(lookbackRaw), 24 * 60)
+      : 60;
+    const serviceKey = String(req.body?.serviceKey || 'telegram').trim() || 'telegram';
+
+    try {
+      const result = await pushLatestAlertWebhook({
+        db,
+        serviceKey,
+        lookbackMinutes,
+        resolveAccountBalance: (providerKey) => resolveProviderAccountBalance(db, providerKey, {
+          refreshIfStale: false,
+        }),
+      });
+
+      if (result.skipped) {
+        res.status(200).json({
+          ok: false,
+          skipped: true,
+          error: result.reason,
+          message: result.message || result.reason,
+          lookbackMinutes: result.lookbackMinutes || lookbackMinutes,
+          evaluated: result.evaluated || 0,
+          filters: config.filters,
+          status: getAlertWebhookStatus(db),
+        });
+        return;
+      }
+
+      res.status(result.ok ? 200 : 502).json({
+        ok: Boolean(result.ok),
+        result,
+        message: result.ok
+          ? `已手动推送最新 ${result.itemCount} 条（最近 ${lookbackMinutes} 分钟内筛选，HTTP ${result.status}）`
+          : (result.error || '手动推送失败'),
+        preview: result.preview || [],
+        status: result.status || getAlertWebhookStatus(db),
+      });
+    } catch (error) {
+      res.status(500).json({
+        ok: false,
+        error: error.message || 'push_latest_failed',
+        message: error.message || '手动推送失败',
+      });
+    }
   });
 
   app.post('/api/settings/telegram/test', requireAdmin(db), async (req, res) => {

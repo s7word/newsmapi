@@ -5,12 +5,15 @@ export default function WebhookPushSettings({
   loading,
   onSave,
   onTest,
+  onPushLatest,
   saving,
   testing,
+  pushingLatest,
   message,
 }) {
   const webhook = webhookConfig?.webhook || {};
   const filters = webhook.filters || {};
+  const status = webhookConfig?.status || {};
   const providerCatalog = webhookConfig?.providerCatalog || [];
   const [enabled, setEnabled] = useState(Boolean(webhook.enabled));
   const [url, setUrl] = useState(webhook.url || '');
@@ -34,6 +37,7 @@ export default function WebhookPushSettings({
     Array.isArray(filters.providerKeys) ? filters.providerKeys : [],
   );
   const [providerQuery, setProviderQuery] = useState('');
+  const [lookbackMinutes, setLookbackMinutes] = useState('60');
   const [localMessage, setLocalMessage] = useState(null);
 
   useEffect(() => {
@@ -99,6 +103,29 @@ export default function WebhookPushSettings({
     await onTest({ url: trimmed, secret: secret || '********' });
   }
 
+  async function handlePushLatestClick() {
+    setLocalMessage(null);
+    const trimmed = String(url || '').trim() || String(webhook.url || '').trim();
+    if (!trimmed) {
+      setLocalMessage({
+        ok: false,
+        text: '请先填写并保存 Webhook URL，再手动推送最新通知。',
+      });
+      return;
+    }
+    const minutes = Number(lookbackMinutes);
+    await onPushLatest({
+      lookbackMinutes: Number.isFinite(minutes) && minutes > 0 ? minutes : 60,
+    });
+  }
+
+  function formatPushTime(value) {
+    if (!value) return '尚未推送';
+    const ms = Date.parse(value);
+    if (!Number.isFinite(ms)) return String(value);
+    return new Date(ms).toLocaleString();
+  }
+
   return (
     <div className="telegram-push-settings">
       <div className="telegram-push-settings__intro">
@@ -128,9 +155,24 @@ export default function WebhookPushSettings({
               最高单价 ≤ ${filters.maxPriceUsd}
             </span>
           ) : null}
+          <span className="provider-settings-badge provider-settings-badge--muted">
+            单次最多 {filters.maxItemsPerPush || 50} 条 · 优先最新
+          </span>
         </div>
-        {!ready ? (
-          <div className="error-banner">
+        {status.lastPushAt || status.lastManualPushAt ? (
+          <p className="webhook-filters__hint">
+            最近一次推送：{formatPushTime(status.lastPushAt)}
+            {status.lastPushSource ? `（${status.lastPushSource === 'manual_latest' ? '手动最新' : '自动'}）` : ''}
+            {status.lastPushItemCount != null ? ` · ${status.lastPushItemCount} 条` : ''}
+            {status.lastPushOk === false ? ` · 失败：${status.lastPushError || 'unknown'}` : ''}
+            {status.lastManualPushAt ? `；上次手动：${formatPushTime(status.lastManualPushAt)}` : ''}
+          </p>
+        ) : (
+          <p className="webhook-filters__hint">
+            自动推送若堆积，可用下方「手动推送最新」把最近窗口内通过过滤的通知合并推一次（优先最新，受单次条数上限约束）。
+          </p>
+        )}
+        {!ready ? (          <div className="error-banner">
             过滤条件可以先保存，但必须同时「勾选启用 + 填写可达的 Webhook URL」后才会真正推送。
             Docker 内不要用 127.0.0.1 指宿主机程序，请用宿主机 IP 或 http://172.17.0.1:端口/...
           </div>
@@ -225,6 +267,19 @@ export default function WebhookPushSettings({
               onChange={(event) => setMaxItems(event.target.value)}
             />
           </label>
+          <p className="webhook-filters__hint">
+            超过上限时<strong>优先保留最新通知</strong>（其次低价）。当前生产若设为 4，堆积时旧消息会挤掉新消息——建议提高，或用手动推送最新。
+          </p>
+          <label>
+            手动推送回看分钟数
+            <input
+              type="number"
+              min="5"
+              max="1440"
+              value={lookbackMinutes}
+              onChange={(event) => setLookbackMinutes(event.target.value)}
+            />
+          </label>
           <label className="telegram-recipient-toggle">
             <input
               type="checkbox"
@@ -281,10 +336,18 @@ export default function WebhookPushSettings({
           <button
             type="button"
             className="ghost-button"
-            disabled={testing}
+            disabled={testing || pushingLatest}
             onClick={handleTestClick}
           >
             {testing ? '测试中…' : '发送测试'}
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={pushingLatest || testing || loading}
+            onClick={handlePushLatestClick}
+          >
+            {pushingLatest ? '推送中…' : '手动推送最新'}
           </button>
         </div>
       </form>

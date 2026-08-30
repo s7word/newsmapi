@@ -33,7 +33,46 @@ describe('alert-webhook', () => {
     expect(noBalance).toEqual([]);
   });
 
-  it('builds simplified payload sorted by price', () => {
+  it('when truncating, prefers newest alerts over older cheap ones', () => {
+    const config = normalizeWebhookConfig({
+      enabled: true,
+      url: 'http://example.test/hook',
+      filters: {
+        maxPriceUsd: 1,
+        maxItemsPerPush: 2,
+        alertTypes: ['restock'],
+      },
+    });
+
+    const events = [
+      {
+        type: 'restock',
+        providerKey: 'a',
+        countryIso2: 'US',
+        minPriceUsd: 0.05,
+        notifiedAt: '2026-08-30T10:00:00.000Z',
+      },
+      {
+        type: 'restock',
+        providerKey: 'a',
+        countryIso2: 'IN',
+        minPriceUsd: 0.18,
+        notifiedAt: '2026-08-30T12:00:00.000Z',
+      },
+      {
+        type: 'restock',
+        providerKey: 'a',
+        countryIso2: 'PH',
+        minPriceUsd: 0.12,
+        notifiedAt: '2026-08-30T11:00:00.000Z',
+      },
+    ];
+
+    const filtered = filterEventsForWebhook(events, config, { balance: '5', currency: 'USD' });
+    expect(filtered.map((row) => row.countryIso2)).toEqual(['IN', 'PH']);
+  });
+
+  it('builds simplified payload sorted by price', async () => {
     const payload = buildWebhookPayload({
       serviceKey: 'telegram',
       serviceLabel: 'Telegram 接码',

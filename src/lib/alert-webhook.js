@@ -6,6 +6,7 @@ const { getProviderDefinition, resolvePortalUrl } = require('../config/providers
 const { getProviderAlertCode } = require('../config/provider-alert-codes');
 
 const WEBHOOK_SETTING_KEY = 'alert_webhook_config';
+const WEBHOOK_STATUS_KEY = 'alert_webhook_last_push';
 
 function defaultWebhookConfig() {
   return {
@@ -22,6 +23,34 @@ function defaultWebhookConfig() {
       maxItemsPerPush: 50,
     },
   };
+}
+
+function defaultWebhookStatus() {
+  return {
+    lastPushAt: null,
+    lastPushSource: null,
+    lastPushOk: null,
+    lastPushItemCount: 0,
+    lastPushError: '',
+    lastManualPushAt: null,
+  };
+}
+
+function getAlertWebhookStatus(db) {
+  const stored = getSetting(db, WEBHOOK_STATUS_KEY, null);
+  return {
+    ...defaultWebhookStatus(),
+    ...(stored && typeof stored === 'object' ? stored : {}),
+  };
+}
+
+function saveAlertWebhookStatus(db, patch = {}) {
+  const next = {
+    ...getAlertWebhookStatus(db),
+    ...patch,
+  };
+  setSetting(db, WEBHOOK_STATUS_KEY, next);
+  return next;
 }
 
 function normalizeProviderKeys(input) {
@@ -122,8 +151,30 @@ function eventPassesWebhookFilters(event, filters, accountBalance) {
   return true;
 }
 
+function eventNotifiedMs(event) {
+  const raw = event?.notifiedAt || event?.notified_at || '';
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 function sortEventsByPriceAsc(events) {
   return [...events].sort((a, b) => {
+    const priceA = Number(a.minPriceUsd);
+    const priceB = Number(b.minPriceUsd);
+    const validA = Number.isFinite(priceA) && priceA > 0;
+    const validB = Number.isFinite(priceB) && priceB > 0;
+    if (validA && validB && priceA !== priceB) return priceA - priceB;
+    if (validA && !validB) return -1;
+    if (!validA && validB) return 1;
+    return String(a.countryIso2 || '').localeCompare(String(b.countryIso2 || ''));
+  });
+}
+
+/** Prefer newest alerts first, then cheaper price — used when truncating to maxItemsPerPush. */
+function sortEventsLatestThenPrice(events) {
+  return [...events].sort((a, b) => {
+    const timeDiff = eventNotifiedMs(b) - eventNotifiedMs(a);
+    if (timeDiff !== 0) return timeDiff;
     const priceA = Number(a.minPriceUsd);
     const priceB = Number(b.minPriceUsd);
     const validA = Number.isFinite(priceA) && priceA > 0;
@@ -165,23 +216,39 @@ function buildWebhookPayload({
   providerName,
   providerKey,
   accountBalance,
+  source = 'auto',
+  sortMode = 'price',
 }) {
-  const definition = getProviderDefinition(providerKey);
-  const alertCode = getProviderAlertCode(providerKey);
+  const definition = providerKey ? getProviderDefinition(providerKey) : null;
+  const alertCode = providerKey ? getProviderAlertCode(providerKey) : '';
   const portalUrl = resolvePortalUrl(definition || { providerKey });
-  const displayName = providerName || definition?.displayName || providerKey;
-  const items = sortEventsByPriceAsc(events).map((event) => buildSimplifiedWebhookItem(event, {
-    providerName: displayName,
-    alertCode,
-    portalUrl,
-    accountBalance,
-  }));
+  const displayName = providerName || definition?.displayName || providerKey || '';
+  const sorted = sortMode === 'latest'
+    ? sortEventsLatestThenPrice(events)
+    : sortEventsByPriceAsc(events);
+  const items = sorted.map((event) => {
+    const eventProviderKey = event.providerKey || providerKey;
+    const eventDefinition = eventProviderKey ? getProviderDefinition(eventProviderKey) : null;
+    const eventName = event.providerName
+      || eventDefinition?.displayName
+      || displayName
+      || eventProviderKey
+      || '';
+    const eventBalance = event.accountBalance || accountBalance;
+    return buildSimplifiedWebhookItem(event, {
+      providerName: eventName,
+      alertCode: getProviderAlertCode(eventProviderKey) || alertCode,
+      portalUrl: resolvePortalUrl(eventDefinition || { providerKey: eventProviderKey }) || portalUrl,
+      accountBalance: eventBalance,
+    });
+  });
 
   return {
     schema: 'smsall.alert.v1',
     sentAt: new Date().toISOString(),
     serviceKey,
     serviceLabel: serviceLabel || serviceKey,
+    source,
     itemCount: items.length,
     items,
   };
@@ -254,11 +321,62 @@ async function postAlertWebhook({
   }
 }
 
-function filterEventsForWebhook(events, config, accountBalance) {
+function filterEventsForWebhook(events, config, accountBalance, {
+  sortMode = 'latest',
+} = {}) {
   const normalized = normalizeWebhookConfig(config || {});
-  const filtered = sortEventsByPriceAsc(events || [])
-    .filter((event) => eventPassesWebhookFilters(event, normalized.filters, accountBalance));
-  return filtered.slice(0, normalized.filters.maxItemsPerPush);
+  const passed = (events || []).filter((event) => {
+    const balance = event.accountBalance || accountBalance;
+    return eventPassesWebhookFilters(event, normalized.filters, balance);
+  });
+  const sorted = sortMode === 'price'
+    ? sortEventsByPriceAsc(passed)
+    : sortEventsLatestThenPrice(passed);
+  return sorted.slice(0, normalized.filters.maxItemsPerPush);
+}
+
+function loadRecentAlertEvents(db, {
+  serviceKey = 'telegram',
+  lookbackMinutes = 60,
+  fetchLimit = 500,
+} = {}) {
+  const minutes = Number(lookbackMinutes);
+  const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? Math.min(Math.floor(minutes), 24 * 60) : 60;
+  const limit = Number(fetchLimit);
+  const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(Math.floor(limit), 2000) : 500;
+  const sinceIso = new Date(Date.now() - safeMinutes * 60 * 1000).toISOString();
+
+  const rows = db.prepare(`
+    SELECT id, service_key, provider_key, country_iso2, alert_type, notified_at, payload_json
+    FROM inventory_alert_log
+    WHERE service_key = ?
+      AND notified_at >= ?
+    ORDER BY id DESC
+    LIMIT ?
+  `).all(serviceKey, sinceIso, safeLimit);
+
+  return rows.map((row) => {
+    let payload = {};
+    try {
+      payload = JSON.parse(row.payload_json || '{}');
+    } catch {
+      payload = {};
+    }
+    return {
+      type: payload.type || row.alert_type,
+      providerKey: payload.providerKey || row.provider_key,
+      providerName: payload.providerName || '',
+      countryIso2: payload.countryIso2 || row.country_iso2,
+      countryName: payload.countryName || row.country_iso2,
+      previousStock: Number(payload.previousStock || 0),
+      newStock: Number(payload.newStock || 0),
+      minPriceUsd: Number(payload.minPriceUsd),
+      minPriceOriginal: Number(payload.minPriceOriginal || payload.minPriceUsd || 0),
+      currency: payload.currency || 'USD',
+      notifiedAt: row.notified_at,
+      alertLogId: row.id,
+    };
+  });
 }
 
 async function dispatchAlertWebhook({
@@ -270,13 +388,18 @@ async function dispatchAlertWebhook({
   events,
   accountBalance,
   fetchImpl = fetch,
+  source = 'auto',
 }) {
   const config = getAlertWebhookConfig(db);
   if (!config.enabled) {
     return { skipped: true, reason: 'disabled' };
   }
 
-  const filtered = filterEventsForWebhook(events, config, accountBalance);
+  const stamped = (events || []).map((event) => ({
+    ...event,
+    notifiedAt: event.notifiedAt || new Date().toISOString(),
+  }));
+  const filtered = filterEventsForWebhook(stamped, config, accountBalance, { sortMode: 'latest' });
   if (!filtered.length) {
     return { skipped: true, reason: 'filtered_out', evaluated: events?.length || 0 };
   }
@@ -288,24 +411,142 @@ async function dispatchAlertWebhook({
     providerKey,
     providerName,
     accountBalance,
+    source,
+    sortMode: 'latest',
   });
 
-  return postAlertWebhook({ config, payload, fetchImpl });
+  const result = await postAlertWebhook({ config, payload, fetchImpl });
+  if (db) {
+    saveAlertWebhookStatus(db, {
+      lastPushAt: new Date().toISOString(),
+      lastPushSource: source,
+      lastPushOk: Boolean(result?.ok),
+      lastPushItemCount: Number(result?.itemCount || filtered.length || 0),
+      lastPushError: result?.ok ? '' : String(result?.error || result?.reason || ''),
+    });
+  }
+  return { ...result, itemCount: filtered.length, evaluated: events?.length || 0 };
+}
+
+async function pushLatestAlertWebhook({
+  db,
+  serviceKey = 'telegram',
+  lookbackMinutes = 60,
+  fetchImpl = fetch,
+  resolveAccountBalance,
+}) {
+  const config = getAlertWebhookConfig(db);
+  if (!config.url) {
+    return { ok: false, skipped: true, reason: 'url_missing', message: 'Webhook URL 未配置' };
+  }
+
+  const recent = loadRecentAlertEvents(db, { serviceKey, lookbackMinutes });
+  if (!recent.length) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'no_recent_alerts',
+      message: `最近 ${lookbackMinutes} 分钟内没有告警日志可推送`,
+      lookbackMinutes,
+      evaluated: 0,
+    };
+  }
+
+  const balanceCache = new Map();
+  async function balanceFor(providerKey) {
+    if (balanceCache.has(providerKey)) return balanceCache.get(providerKey);
+    let balance = null;
+    if (typeof resolveAccountBalance === 'function') {
+      try {
+        balance = await resolveAccountBalance(providerKey);
+      } catch {
+        balance = null;
+      }
+    }
+    balanceCache.set(providerKey, balance);
+    return balance;
+  }
+
+  const withBalances = [];
+  for (const event of recent) {
+    const accountBalance = await balanceFor(event.providerKey);
+    withBalances.push({ ...event, accountBalance });
+  }
+
+  const filtered = filterEventsForWebhook(withBalances, config, null, { sortMode: 'latest' });
+  if (!filtered.length) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'filtered_out',
+      message: '最近告警全部被当前过滤规则拦截（单价/余额/平台/类型），没有可推送条目',
+      lookbackMinutes,
+      evaluated: recent.length,
+      filters: config.filters,
+    };
+  }
+
+  const serviceLabel = serviceKey === 'telegram' ? 'Telegram 接码' : serviceKey;
+  const payload = buildWebhookPayload({
+    serviceKey,
+    serviceLabel,
+    events: filtered,
+    source: 'manual_latest',
+    sortMode: 'latest',
+  });
+  payload.manual = true;
+  payload.note = `手动推送最近 ${lookbackMinutes} 分钟内、通过过滤的最新 ${filtered.length} 条（优先最新，其次低价）`;
+  payload.lookbackMinutes = lookbackMinutes;
+  payload.evaluated = recent.length;
+
+  const result = await postAlertWebhook({
+    config: {
+      ...config,
+      enabled: true,
+    },
+    payload,
+    fetchImpl,
+  });
+
+  const status = saveAlertWebhookStatus(db, {
+    lastPushAt: new Date().toISOString(),
+    lastPushSource: 'manual_latest',
+    lastPushOk: Boolean(result?.ok),
+    lastPushItemCount: Number(result?.itemCount || filtered.length || 0),
+    lastPushError: result?.ok ? '' : String(result?.error || result?.reason || ''),
+    lastManualPushAt: new Date().toISOString(),
+  });
+
+  return {
+    ...result,
+    itemCount: filtered.length,
+    evaluated: recent.length,
+    lookbackMinutes,
+    status,
+    preview: payload.items.slice(0, 8),
+  };
 }
 
 module.exports = {
   WEBHOOK_SETTING_KEY,
+  WEBHOOK_STATUS_KEY,
   buildSimplifiedWebhookItem,
   buildWebhookPayload,
   defaultWebhookConfig,
+  defaultWebhookStatus,
   dispatchAlertWebhook,
   eventPassesWebhookFilters,
   filterEventsForWebhook,
   getAlertWebhookConfig,
+  getAlertWebhookStatus,
+  loadRecentAlertEvents,
   normalizeWebhookConfig,
   postAlertWebhook,
   publicWebhookConfig,
+  pushLatestAlertWebhook,
   saveAlertWebhookConfig,
+  saveAlertWebhookStatus,
   signWebhookBody,
   sortEventsByPriceAsc,
+  sortEventsLatestThenPrice,
 };
