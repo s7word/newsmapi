@@ -1,0 +1,33 @@
+services:
+  smsbazaar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: smsall-smsbazaar:latest
+    container_name: smsall_smsbazaar
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    env_file:
+      - .env
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8787"
+      DATABASE_PATH: /app/data/app.sqlite
+      NODE_ENV: production
+    volumes:
+      # Persist SQLite + settings/keys; do not bake secrets into the image
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8787/api/meta"]
+      interval: 30s
+      timeout: 5s
+      start_period: 25s
+      retries: 3
+    networks:
+      - smsall_net
+
+networks:
+  smsall_net:
+    driver: bridge
