@@ -499,7 +499,7 @@ async function pushLatestAlertWebhook({
   payload.lookbackMinutes = lookbackMinutes;
   payload.evaluated = recent.length;
 
-  const result = await postAlertWebhook({
+  const delivery = await postAlertWebhook({
     config: {
       ...config,
       enabled: true,
@@ -511,14 +511,16 @@ async function pushLatestAlertWebhook({
   const status = saveAlertWebhookStatus(db, {
     lastPushAt: new Date().toISOString(),
     lastPushSource: 'manual_latest',
-    lastPushOk: Boolean(result?.ok),
-    lastPushItemCount: Number(result?.itemCount || filtered.length || 0),
-    lastPushError: result?.ok ? '' : String(result?.error || result?.reason || ''),
+    lastPushOk: Boolean(delivery?.ok),
+    lastPushItemCount: Number(delivery?.itemCount || filtered.length || 0),
+    lastPushError: delivery?.ok ? '' : String(delivery?.error || delivery?.reason || ''),
     lastManualPushAt: new Date().toISOString(),
   });
 
   return {
-    ...result,
+    ok: Boolean(delivery?.ok),
+    httpStatus: delivery?.status,
+    error: delivery?.error,
     itemCount: filtered.length,
     evaluated: recent.length,
     lookbackMinutes,

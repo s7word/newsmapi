@@ -632,7 +632,7 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
         ok: Boolean(result.ok),
         result,
         message: result.ok
-          ? `已手动推送最新 ${result.itemCount} 条（最近 ${lookbackMinutes} 分钟内筛选，HTTP ${result.status}）`
+          ? `已手动推送最新 ${result.itemCount} 条（最近 ${lookbackMinutes} 分钟内筛选，HTTP ${result.httpStatus ?? ''}）`
           : (result.error || '手动推送失败'),
         preview: result.preview || [],
         status: result.status || getAlertWebhookStatus(db),
