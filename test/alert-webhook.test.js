@@ -39,25 +39,40 @@ describe('alert-webhook', () => {
       enabled: true,
       url: 'http://example.test/hook',
       filters: {
-        maxPriceUsd: 1,
+        maxPriceUsd: 0.2,
         requireBalance: true,
         alertTypes: ['restock', 'new_listing'],
       },
       sniper: {
         enabled: true,
-        countries: ['IR', 'IQ'],
+        targets: [
+          { country: 'IR', maxPriceUsd: 0.9 },
+          { country: 'IQ', maxPriceUsd: 1.8 },
+        ],
         requireBalance: true,
-        maxPriceUsd: 0.5,
       },
     });
 
     const events = [
       { type: 'restock', providerKey: 'smsbower', countryIso2: 'IR', minPriceUsd: 0.12 },
+      { type: 'restock', providerKey: 'smsbower', countryIso2: 'IR', minPriceUsd: 1.2 },
+      { type: 'restock', providerKey: 'smsbower', countryIso2: 'IQ', minPriceUsd: 1.5 },
       { type: 'restock', providerKey: 'smsbower', countryIso2: 'US', minPriceUsd: 0.1 },
-      { type: 'new_listing', providerKey: 'smsbower', countryIso2: 'IQ', minPriceUsd: 0.9 },
     ];
     const annotated = annotateSniperEvents(events, config, { balance: '10', currency: 'USD' });
-    expect(annotated.filter((row) => row.sniper).map((row) => row.countryIso2)).toEqual(['IR']);
+    expect(annotated.filter((row) => row.sniper).map((row) => `${row.countryIso2}:${row.minPriceUsd}`))
+      .toEqual(['IR:0.12', 'IQ:1.5']);
+    expect(annotated.find((row) => row.countryIso2 === 'IR' && row.minPriceUsd === 1.2)).toMatchObject({
+      sniper: false,
+      sniperOverPrice: true,
+      sniperWatched: true,
+      sniperMaxPriceUsd: 0.9,
+    });
+
+    // Over-ceiling watched country still passes notify filter even above global maxPrice.
+    const filtered = filterEventsForWebhook(annotated, config, { balance: '10', currency: 'USD' });
+    expect(filtered.some((row) => row.countryIso2 === 'IR' && row.minPriceUsd === 1.2)).toBe(true);
+    expect(filtered.find((row) => row.countryIso2 === 'IR' && row.minPriceUsd === 1.2).sniper).toBe(false);
 
     const payload = buildWebhookPayload({
       serviceKey: 'telegram',

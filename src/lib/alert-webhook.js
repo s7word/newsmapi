@@ -24,9 +24,13 @@ function defaultWebhookConfig() {
     },
     sniper: {
       enabled: false,
+      // Per-country sniper ceiling: [{ country: 'IR', maxPriceUsd: 0.9 }, ...]
+      targets: [],
+      // Derived / legacy alias of target countries.
       countries: [],
       requireBalance: true,
       minBalance: null,
+      // Legacy global ceiling; kept for migration only.
       maxPriceUsd: null,
       alertTypes: ['new_listing', 'restock'],
       providerKeys: null,
@@ -89,28 +93,81 @@ function normalizeCountryList(input) {
   )];
 }
 
+function normalizeSniperTargets(input = {}, legacyCountries = [], legacyMaxPriceUsd = null) {
+  const byCountry = new Map();
+
+  function upsert(countryRaw, maxPriceRaw) {
+    const country = String(countryRaw || '').trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(country)) return;
+    const maxPriceUsd = maxPriceRaw == null || maxPriceRaw === ''
+      ? null
+      : Number(maxPriceRaw);
+    byCountry.set(country, {
+      country,
+      maxPriceUsd: Number.isFinite(maxPriceUsd) && maxPriceUsd > 0 ? maxPriceUsd : null,
+    });
+  }
+
+  if (Array.isArray(input)) {
+    for (const row of input) {
+      if (typeof row === 'string') {
+        upsert(row, legacyMaxPriceUsd);
+      } else if (row && typeof row === 'object') {
+        upsert(row.country || row.iso2 || row.code, row.maxPriceUsd ?? row.maxPrice ?? row.price);
+      }
+    }
+  } else if (input && typeof input === 'object' && !Array.isArray(input)) {
+    for (const [country, value] of Object.entries(input)) {
+      if (value && typeof value === 'object') {
+        upsert(country, value.maxPriceUsd ?? value.maxPrice ?? value.price);
+      } else {
+        upsert(country, value);
+      }
+    }
+  }
+
+  // Migrate legacy countries[] + single maxPriceUsd into the table.
+  for (const country of normalizeCountryList(legacyCountries)) {
+    if (!byCountry.has(country)) {
+      upsert(country, legacyMaxPriceUsd);
+    }
+  }
+
+  return [...byCountry.values()].sort((a, b) => a.country.localeCompare(b.country));
+}
+
 function normalizeSniperConfig(input = {}, filters = {}) {
   const defaults = defaultWebhookConfig().sniper;
-  const maxPriceRaw = input.maxPriceUsd;
-  const maxPriceUsd = maxPriceRaw == null || maxPriceRaw === ''
+  const legacyMaxPriceRaw = input.maxPriceUsd;
+  const legacyMaxPriceUsd = legacyMaxPriceRaw == null || legacyMaxPriceRaw === ''
     ? null
-    : Number(maxPriceRaw);
+    : Number(legacyMaxPriceRaw);
+  const legacyMax = Number.isFinite(legacyMaxPriceUsd) && legacyMaxPriceUsd > 0
+    ? legacyMaxPriceUsd
+    : (filters.maxPriceUsd != null ? filters.maxPriceUsd : null);
   const minBalanceRaw = input.minBalance;
   const minBalance = minBalanceRaw == null || minBalanceRaw === ''
     ? null
     : Number(minBalanceRaw);
 
+  const hasExplicitTargets = Array.isArray(input.targets) || (input.targets && typeof input.targets === 'object');
+  const targets = normalizeSniperTargets(
+    input.targets,
+    hasExplicitTargets ? [] : input.countries,
+    hasExplicitTargets ? null : legacyMax,
+  );
+
   return {
     enabled: Boolean(input.enabled),
-    countries: normalizeCountryList(input.countries),
+    targets,
+    countries: targets.map((row) => row.country),
     // Sniper defaults to requiring balance so only funded platforms fire auto-actions.
     requireBalance: input.requireBalance == null ? true : Boolean(input.requireBalance),
     minBalance: Number.isFinite(minBalance) && minBalance >= 0
       ? minBalance
       : (filters.minBalance != null ? filters.minBalance : defaults.minBalance),
-    maxPriceUsd: Number.isFinite(maxPriceUsd) && maxPriceUsd > 0
-      ? maxPriceUsd
-      : (filters.maxPriceUsd != null ? filters.maxPriceUsd : null),
+    // Kept for backward-compatible reads; per-country targets take precedence.
+    maxPriceUsd: legacyMax,
     alertTypes: normalizeAlertTypes(input.alertTypes || filters.alertTypes),
     providerKeys: normalizeProviderKeys(
       input.providerKeys === undefined ? filters.providerKeys : input.providerKeys,
@@ -211,32 +268,70 @@ function eventPassesWebhookFilters(event, filters, accountBalance) {
   return true;
 }
 
-function isSniperCountryHit(event, sniper) {
-  if (!sniper?.enabled) return false;
-  if (!Array.isArray(sniper.countries) || !sniper.countries.length) return false;
+function getSniperTarget(event, sniper) {
+  if (!sniper?.enabled) return null;
+  const targets = Array.isArray(sniper.targets) ? sniper.targets : [];
+  if (!targets.length) return null;
   const country = String(event.countryIso2 || event.country || '').toUpperCase();
-  return sniper.countries.includes(country);
+  return targets.find((row) => row.country === country) || null;
 }
 
-function eventPassesSniperRules(event, sniper, accountBalance) {
-  if (!isSniperCountryHit(event, sniper)) return false;
+function isSniperCountryWatched(event, sniper) {
+  return Boolean(getSniperTarget(event, sniper));
+}
+
+/** @deprecated use isSniperCountryWatched / getSniperTarget */
+function isSniperCountryHit(event, sniper) {
+  return isSniperCountryWatched(event, sniper);
+}
+
+function eventPassesSniperBalanceAndType(event, sniper, accountBalance) {
   return eventPassesWebhookFilters(event, {
     alertTypes: sniper.alertTypes,
     providerKeys: sniper.providerKeys,
-    maxPriceUsd: sniper.maxPriceUsd,
+    maxPriceUsd: null, // price checked per-country
     requireBalance: sniper.requireBalance,
     minBalance: sniper.minBalance,
   }, accountBalance);
+}
+
+/**
+ * Sniper tag only when watched country AND price <= that country's maxPriceUsd.
+ * Over-ceiling watched countries are still notifiable, but without sniper tag.
+ */
+function eventPassesSniperRules(event, sniper, accountBalance) {
+  const target = getSniperTarget(event, sniper);
+  if (!target) return false;
+  if (!eventPassesSniperBalanceAndType(event, sniper, accountBalance)) return false;
+  const price = Number(event.minPriceUsd);
+  if (!Number.isFinite(price) || price <= 0) return false;
+  if (target.maxPriceUsd == null) return true;
+  return price <= target.maxPriceUsd;
+}
+
+function isWatchedCountryOverSniperPrice(event, sniper, accountBalance) {
+  const target = getSniperTarget(event, sniper);
+  if (!target) return false;
+  if (!eventPassesSniperBalanceAndType(event, sniper, accountBalance)) return false;
+  const price = Number(event.minPriceUsd);
+  if (!Number.isFinite(price) || price <= 0) return false;
+  if (target.maxPriceUsd == null) return false;
+  return price > target.maxPriceUsd;
 }
 
 function annotateSniperEvents(events, config, accountBalance) {
   const normalized = normalizeWebhookConfig(config || {});
   return (events || []).map((event) => {
     const balance = event.accountBalance || accountBalance;
+    const target = getSniperTarget(event, normalized.sniper);
     const sniper = eventPassesSniperRules(event, normalized.sniper, balance);
+    const watchedOverPrice = isWatchedCountryOverSniperPrice(event, normalized.sniper, balance);
     return {
       ...event,
       sniper,
+      sniperWatched: Boolean(target),
+      sniperMaxPriceUsd: target?.maxPriceUsd ?? null,
+      sniperOverPrice: watchedOverPrice,
       tags: sniper
         ? [...new Set([...(Array.isArray(event.tags) ? event.tags : []), 'sniper'])]
         : (Array.isArray(event.tags) ? event.tags : []),
@@ -307,6 +402,9 @@ function buildSimplifiedWebhookItem(event, {
     balanceCurrency: accountBalance?.currency || 'USD',
     portalUrl: String(portalUrl || ''),
     sniper,
+    sniperWatched: Boolean(event.sniperWatched),
+    sniperMaxPriceUsd: event.sniperMaxPriceUsd == null ? null : Number(event.sniperMaxPriceUsd),
+    sniperOverPrice: Boolean(event.sniperOverPrice),
     tags,
     priority: sniper ? 'sniper' : 'normal',
   };
@@ -442,12 +540,31 @@ function filterEventsForWebhook(events, config, accountBalance, {
   const normalized = normalizeWebhookConfig(config || {});
   const passed = (events || []).filter((event) => {
     const balance = event.accountBalance || accountBalance;
-    return eventPassesWebhookFilters(event, normalized.filters, balance);
+    if (eventPassesWebhookFilters(event, normalized.filters, balance)) return true;
+    // Watched sniper country over its sniper ceiling: still notify, but no sniper tag.
+    const annotated = annotateSniperEvents([event], normalized, balance)[0];
+    return Boolean(annotated?.sniperOverPrice);
   });
   const sorted = sortMode === 'price'
     ? sortEventsByPriceAsc(passed)
     : sortEventsLatestThenPrice(passed);
-  return sorted.slice(0, normalized.filters.maxItemsPerPush);
+  // Prefer keeping sniper-tagged / watched items when truncating.
+  const preferred = sortMode === 'latest'
+    ? [...sorted].sort((a, b) => {
+      const aScore = (a.sniper ? 2 : 0) + (a.sniperWatched || a.sniperOverPrice ? 1 : 0);
+      const bScore = (b.sniper ? 2 : 0) + (b.sniperWatched || b.sniperOverPrice ? 1 : 0);
+      if (bScore !== aScore) return bScore - aScore;
+      return 0;
+    })
+    : sorted;
+  // Re-sort preferred by latest/price while keeping preference as soft priority via stable partition
+  const sniperFirst = preferred.filter((e) => e.sniper || e.sniperOverPrice || e.sniperWatched);
+  const rest = preferred.filter((e) => !(e.sniper || e.sniperOverPrice || e.sniperWatched));
+  const ordered = [
+    ...(sortMode === 'price' ? sortEventsByPriceAsc(sniperFirst) : sortEventsLatestThenPrice(sniperFirst)),
+    ...(sortMode === 'price' ? sortEventsByPriceAsc(rest) : sortEventsLatestThenPrice(rest)),
+  ];
+  return ordered.slice(0, normalized.filters.maxItemsPerPush);
 }
 
 function loadRecentAlertEvents(db, {
@@ -715,10 +832,14 @@ module.exports = {
   filterEventsForWebhook,
   getAlertWebhookConfig,
   getAlertWebhookStatus,
+  getSniperTarget,
   isSniperCountryHit,
+  isSniperCountryWatched,
+  isWatchedCountryOverSniperPrice,
   loadRecentAlertEvents,
   normalizeCountryList,
   normalizeSniperConfig,
+  normalizeSniperTargets,
   normalizeWebhookConfig,
   postAlertWebhook,
   publicWebhookConfig,
