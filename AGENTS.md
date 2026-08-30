@@ -29,6 +29,12 @@
 - 查询：`userInfo`（积分余额）、`getPrice`（按 product_id 查价；积分按 1 积分=0.01 CNY 换算）。当前账号侧报价多为产品统一价，无分国家库存字段。
 - 产品映射见 `services-catalog.js`（Telegram=`5`，OpenAI=`127` 等）。
 
+### 程序推送 Webhook
+
+- 设置 → 程序推送；协议 `docs/alert-webhook.md`（`smsall.alert.v1`）。
+- **手动推送最新**：`POST /api/settings/webhook/push-latest`，合并最近窗口内过滤后的最新条目。
+- **狙击**：配置 `sniper.countries`（ISO2）。有余额平台命中补货/上新时立刻单独推送 `source=sniper`，条目含 `sniper:true` / `tags:["sniper"]`，请求头 `X-Smsall-Sniper: 1`。不受 `maxItemsPerPush` 截断。
+
 ### SMSTG
 
 - API 根：`https://smstg.org/api`（`getBalance` / `buy` / `getOtp`）。
