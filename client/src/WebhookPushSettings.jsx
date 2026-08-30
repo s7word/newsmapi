@@ -13,6 +13,7 @@ export default function WebhookPushSettings({
 }) {
   const webhook = webhookConfig?.webhook || {};
   const filters = webhook.filters || {};
+  const sniper = webhook.sniper || {};
   const status = webhookConfig?.status || {};
   const providerCatalog = webhookConfig?.providerCatalog || [];
   const [enabled, setEnabled] = useState(Boolean(webhook.enabled));
@@ -38,11 +39,22 @@ export default function WebhookPushSettings({
   );
   const [providerQuery, setProviderQuery] = useState('');
   const [lookbackMinutes, setLookbackMinutes] = useState('60');
+  const [sniperEnabled, setSniperEnabled] = useState(Boolean(sniper.enabled));
+  const [sniperCountries, setSniperCountries] = useState(
+    Array.isArray(sniper.countries) ? sniper.countries.join(', ') : '',
+  );
+  const [sniperRequireBalance, setSniperRequireBalance] = useState(
+    sniper.requireBalance == null ? true : Boolean(sniper.requireBalance),
+  );
+  const [sniperMaxPriceUsd, setSniperMaxPriceUsd] = useState(
+    sniper.maxPriceUsd == null ? '' : String(sniper.maxPriceUsd),
+  );
   const [localMessage, setLocalMessage] = useState(null);
 
   useEffect(() => {
     const next = webhookConfig?.webhook || {};
     const nextFilters = next.filters || {};
+    const nextSniper = next.sniper || {};
     setEnabled(Boolean(next.enabled));
     setUrl(next.url || '');
     setSecret('');
@@ -54,6 +66,10 @@ export default function WebhookPushSettings({
     setMaxItems(String(nextFilters.maxItemsPerPush || 50));
     setAllProviders(nextFilters.providerKeys == null);
     setSelectedProviders(Array.isArray(nextFilters.providerKeys) ? nextFilters.providerKeys : []);
+    setSniperEnabled(Boolean(nextSniper.enabled));
+    setSniperCountries(Array.isArray(nextSniper.countries) ? nextSniper.countries.join(', ') : '');
+    setSniperRequireBalance(nextSniper.requireBalance == null ? true : Boolean(nextSniper.requireBalance));
+    setSniperMaxPriceUsd(nextSniper.maxPriceUsd == null ? '' : String(nextSniper.maxPriceUsd));
   }, [webhookConfig]);
 
   const filteredProviders = providerCatalog.filter((row) => {
@@ -86,6 +102,17 @@ export default function WebhookPushSettings({
         alertTypes,
         providerKeys: allProviders ? null : selectedProviders,
         maxItemsPerPush: Number(maxItems) || 50,
+      },
+      sniper: {
+        enabled: sniperEnabled,
+        countries: String(sniperCountries || '')
+          .split(/[,;\s|/]+/)
+          .map((value) => value.trim().toUpperCase())
+          .filter(Boolean),
+        requireBalance: sniperRequireBalance,
+        maxPriceUsd: sniperMaxPriceUsd === '' ? null : Number(sniperMaxPriceUsd),
+        alertTypes: ['new_listing', 'restock'],
+        providerKeys: null,
       },
     });
   }
@@ -158,18 +185,32 @@ export default function WebhookPushSettings({
           <span className="provider-settings-badge provider-settings-badge--muted">
             单次最多 {filters.maxItemsPerPush || 50} 条 · 优先最新
           </span>
+          {sniper.enabled && (sniper.countries || []).length ? (
+            <span className="provider-settings-badge provider-settings-badge--ok">
+              狙击 {(sniper.countries || []).join('/')}
+            </span>
+          ) : (
+            <span className="provider-settings-badge provider-settings-badge--muted">
+              狙击未启用
+            </span>
+          )}
         </div>
-        {status.lastPushAt || status.lastManualPushAt ? (
+        {status.lastPushAt || status.lastManualPushAt || status.lastSniperPushAt ? (
           <p className="webhook-filters__hint">
             最近一次推送：{formatPushTime(status.lastPushAt)}
-            {status.lastPushSource ? `（${status.lastPushSource === 'manual_latest' ? '手动最新' : '自动'}）` : ''}
+            {status.lastPushSource ? `（${
+              status.lastPushSource === 'manual_latest' ? '手动最新'
+                : status.lastPushSource === 'sniper' ? '狙击'
+                  : '自动'
+            }）` : ''}
             {status.lastPushItemCount != null ? ` · ${status.lastPushItemCount} 条` : ''}
             {status.lastPushOk === false ? ` · 失败：${status.lastPushError || 'unknown'}` : ''}
             {status.lastManualPushAt ? `；上次手动：${formatPushTime(status.lastManualPushAt)}` : ''}
+            {status.lastSniperPushAt ? `；上次狙击：${formatPushTime(status.lastSniperPushAt)}（${status.lastSniperItemCount || 0} 条）` : ''}
           </p>
         ) : (
           <p className="webhook-filters__hint">
-            自动推送若堆积，可用下方「手动推送最新」把最近窗口内通过过滤的通知合并推一次（优先最新，受单次条数上限约束）。
+            自动推送若堆积，可用「手动推送最新」。狙击国家命中时会单独打标并立即推给上游（`source=sniper`）。
           </p>
         )}
         {!ready ? (          <div className="error-banner">
@@ -320,6 +361,60 @@ export default function WebhookPushSettings({
               </div>
             </div>
           ) : null}
+        </div>
+
+        <div className="webhook-filters">
+          <h4>狙击（优先推上游）</h4>
+          <p className="webhook-filters__hint">
+            监控<strong>有余额平台</strong>上你指定的国家：一旦补货或上新，会单独发起一次
+            <code> source=sniper </code>
+            推送，条目带
+            <code> sniper:true </code>
+            /
+            <code> tags:[&quot;sniper&quot;] </code>
+            ，并加请求头
+            <code> X-Smsall-Sniper: 1 </code>
+            ，方便上游自动下单。不受「单次最多条数」截断。
+          </p>
+          <label className="telegram-recipient-toggle">
+            <input
+              type="checkbox"
+              checked={sniperEnabled}
+              onChange={(event) => setSniperEnabled(event.target.checked)}
+            />
+            启用狙击
+          </label>
+          <label>
+            狙击国家（ISO2，逗号/空格分隔）
+            <input
+              type="text"
+              value={sniperCountries}
+              onChange={(event) => setSniperCountries(event.target.value)}
+              placeholder="例如 IR, IQ, PH, ID"
+              disabled={!sniperEnabled}
+            />
+          </label>
+          <label className="telegram-recipient-toggle">
+            <input
+              type="checkbox"
+              checked={sniperRequireBalance}
+              onChange={(event) => setSniperRequireBalance(event.target.checked)}
+              disabled={!sniperEnabled}
+            />
+            仅有余额平台才狙击（推荐开启）
+          </label>
+          <label>
+            狙击最高单价 USD（空=跟随上方过滤）
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={sniperMaxPriceUsd}
+              onChange={(event) => setSniperMaxPriceUsd(event.target.value)}
+              placeholder="例如 0.2"
+              disabled={!sniperEnabled}
+            />
+          </label>
         </div>
 
         {displayMessage ? (

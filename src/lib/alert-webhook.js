@@ -22,6 +22,15 @@ function defaultWebhookConfig() {
       providerKeys: null,
       maxItemsPerPush: 50,
     },
+    sniper: {
+      enabled: false,
+      countries: [],
+      requireBalance: true,
+      minBalance: null,
+      maxPriceUsd: null,
+      alertTypes: ['new_listing', 'restock'],
+      providerKeys: null,
+    },
   };
 }
 
@@ -33,6 +42,8 @@ function defaultWebhookStatus() {
     lastPushItemCount: 0,
     lastPushError: '',
     lastManualPushAt: null,
+    lastSniperPushAt: null,
+    lastSniperItemCount: 0,
   };
 }
 
@@ -66,9 +77,51 @@ function normalizeAlertTypes(input) {
   return next.length ? next : ['new_listing', 'restock'];
 }
 
+function normalizeCountryList(input) {
+  if (input == null) return [];
+  const raw = Array.isArray(input)
+    ? input
+    : String(input).split(/[,;\s|/]+/);
+  return [...new Set(
+    raw
+      .map((value) => String(value || '').trim().toUpperCase())
+      .filter((value) => /^[A-Z]{2}$/.test(value)),
+  )];
+}
+
+function normalizeSniperConfig(input = {}, filters = {}) {
+  const defaults = defaultWebhookConfig().sniper;
+  const maxPriceRaw = input.maxPriceUsd;
+  const maxPriceUsd = maxPriceRaw == null || maxPriceRaw === ''
+    ? null
+    : Number(maxPriceRaw);
+  const minBalanceRaw = input.minBalance;
+  const minBalance = minBalanceRaw == null || minBalanceRaw === ''
+    ? null
+    : Number(minBalanceRaw);
+
+  return {
+    enabled: Boolean(input.enabled),
+    countries: normalizeCountryList(input.countries),
+    // Sniper defaults to requiring balance so only funded platforms fire auto-actions.
+    requireBalance: input.requireBalance == null ? true : Boolean(input.requireBalance),
+    minBalance: Number.isFinite(minBalance) && minBalance >= 0
+      ? minBalance
+      : (filters.minBalance != null ? filters.minBalance : defaults.minBalance),
+    maxPriceUsd: Number.isFinite(maxPriceUsd) && maxPriceUsd > 0
+      ? maxPriceUsd
+      : (filters.maxPriceUsd != null ? filters.maxPriceUsd : null),
+    alertTypes: normalizeAlertTypes(input.alertTypes || filters.alertTypes),
+    providerKeys: normalizeProviderKeys(
+      input.providerKeys === undefined ? filters.providerKeys : input.providerKeys,
+    ),
+  };
+}
+
 function normalizeWebhookConfig(input = {}) {
   const defaults = defaultWebhookConfig();
   const filtersIn = input.filters && typeof input.filters === 'object' ? input.filters : {};
+  const sniperIn = input.sniper && typeof input.sniper === 'object' ? input.sniper : {};
   const maxPriceRaw = filtersIn.maxPriceUsd;
   const maxPriceUsd = maxPriceRaw == null || maxPriceRaw === ''
     ? null
@@ -80,19 +133,22 @@ function normalizeWebhookConfig(input = {}) {
   const timeoutMs = Number(input.timeoutMs);
   const maxItems = Number(filtersIn.maxItemsPerPush);
 
+  const filters = {
+    maxPriceUsd: Number.isFinite(maxPriceUsd) && maxPriceUsd > 0 ? maxPriceUsd : null,
+    requireBalance: Boolean(filtersIn.requireBalance),
+    minBalance: Number.isFinite(minBalance) && minBalance >= 0 ? minBalance : null,
+    alertTypes: normalizeAlertTypes(filtersIn.alertTypes),
+    providerKeys: normalizeProviderKeys(filtersIn.providerKeys),
+    maxItemsPerPush: Number.isFinite(maxItems) && maxItems > 0 ? Math.min(Math.floor(maxItems), 200) : 50,
+  };
+
   return {
     enabled: Boolean(input.enabled),
     url: String(input.url || '').trim(),
     secret: String(input.secret || '').trim(),
     timeoutMs: Number.isFinite(timeoutMs) && timeoutMs >= 1000 ? Math.min(timeoutMs, 30000) : defaults.timeoutMs,
-    filters: {
-      maxPriceUsd: Number.isFinite(maxPriceUsd) && maxPriceUsd > 0 ? maxPriceUsd : null,
-      requireBalance: Boolean(filtersIn.requireBalance),
-      minBalance: Number.isFinite(minBalance) && minBalance >= 0 ? minBalance : null,
-      alertTypes: normalizeAlertTypes(filtersIn.alertTypes),
-      providerKeys: normalizeProviderKeys(filtersIn.providerKeys),
-      maxItemsPerPush: Number.isFinite(maxItems) && maxItems > 0 ? Math.min(Math.floor(maxItems), 200) : 50,
-    },
+    filters,
+    sniper: normalizeSniperConfig(sniperIn, filters),
   };
 }
 
@@ -109,6 +165,10 @@ function saveAlertWebhookConfig(db, patch = {}) {
     filters: {
       ...current.filters,
       ...(patch.filters && typeof patch.filters === 'object' ? patch.filters : {}),
+    },
+    sniper: {
+      ...current.sniper,
+      ...(patch.sniper && typeof patch.sniper === 'object' ? patch.sniper : {}),
     },
   });
   setSetting(db, WEBHOOK_SETTING_KEY, merged);
@@ -149,6 +209,39 @@ function eventPassesWebhookFilters(event, filters, accountBalance) {
   }
 
   return true;
+}
+
+function isSniperCountryHit(event, sniper) {
+  if (!sniper?.enabled) return false;
+  if (!Array.isArray(sniper.countries) || !sniper.countries.length) return false;
+  const country = String(event.countryIso2 || event.country || '').toUpperCase();
+  return sniper.countries.includes(country);
+}
+
+function eventPassesSniperRules(event, sniper, accountBalance) {
+  if (!isSniperCountryHit(event, sniper)) return false;
+  return eventPassesWebhookFilters(event, {
+    alertTypes: sniper.alertTypes,
+    providerKeys: sniper.providerKeys,
+    maxPriceUsd: sniper.maxPriceUsd,
+    requireBalance: sniper.requireBalance,
+    minBalance: sniper.minBalance,
+  }, accountBalance);
+}
+
+function annotateSniperEvents(events, config, accountBalance) {
+  const normalized = normalizeWebhookConfig(config || {});
+  return (events || []).map((event) => {
+    const balance = event.accountBalance || accountBalance;
+    const sniper = eventPassesSniperRules(event, normalized.sniper, balance);
+    return {
+      ...event,
+      sniper,
+      tags: sniper
+        ? [...new Set([...(Array.isArray(event.tags) ? event.tags : []), 'sniper'])]
+        : (Array.isArray(event.tags) ? event.tags : []),
+    };
+  });
 }
 
 function eventNotifiedMs(event) {
@@ -193,6 +286,12 @@ function buildSimplifiedWebhookItem(event, {
   accountBalance = null,
 } = {}) {
   const balance = parseBalanceNumber(accountBalance);
+  const sniper = Boolean(event.sniper);
+  const tags = Array.isArray(event.tags)
+    ? [...new Set(event.tags.map((tag) => String(tag || '').trim()).filter(Boolean))]
+    : [];
+  if (sniper && !tags.includes('sniper')) tags.push('sniper');
+
   return {
     type: event.type,
     country: String(event.countryIso2 || '').toUpperCase(),
@@ -202,10 +301,14 @@ function buildSimplifiedWebhookItem(event, {
     stockFrom: Number(event.previousStock || 0),
     stockTo: Number(event.newStock || 0),
     provider: String(providerName || event.providerName || ''),
+    providerKey: String(event.providerKey || ''),
     providerCode: String(alertCode || ''),
     balance,
     balanceCurrency: accountBalance?.currency || 'USD',
     portalUrl: String(portalUrl || ''),
+    sniper,
+    tags,
+    priority: sniper ? 'sniper' : 'normal',
   };
 }
 
@@ -218,6 +321,7 @@ function buildWebhookPayload({
   accountBalance,
   source = 'auto',
   sortMode = 'price',
+  sniper = false,
 }) {
   const definition = providerKey ? getProviderDefinition(providerKey) : null;
   const alertCode = providerKey ? getProviderAlertCode(providerKey) : '';
@@ -243,7 +347,7 @@ function buildWebhookPayload({
     });
   });
 
-  return {
+  const payload = {
     schema: 'smsall.alert.v1',
     sentAt: new Date().toISOString(),
     serviceKey,
@@ -252,6 +356,13 @@ function buildWebhookPayload({
     itemCount: items.length,
     items,
   };
+
+  if (sniper || source === 'sniper' || items.some((item) => item.sniper)) {
+    payload.sniper = true;
+    payload.sniperItemCount = items.filter((item) => item.sniper).length;
+  }
+
+  return payload;
 }
 
 function signWebhookBody(secret, bodyText) {
@@ -283,6 +394,10 @@ async function postAlertWebhook({
     'User-Agent': 'smsall-alert-webhook/1.0',
     'X-Smsall-Schema': 'smsall.alert.v1',
   };
+  if (payload?.sniper || payload?.source === 'sniper') {
+    headers['X-Smsall-Sniper'] = '1';
+    headers['X-Smsall-Priority'] = 'sniper';
+  }
   const signature = signWebhookBody(normalized.secret, bodyText);
   if (signature) {
     headers['X-Smsall-Signature'] = signature;
@@ -395,37 +510,92 @@ async function dispatchAlertWebhook({
     return { skipped: true, reason: 'disabled' };
   }
 
-  const stamped = (events || []).map((event) => ({
+  const stamped = annotateSniperEvents((events || []).map((event) => ({
     ...event,
     notifiedAt: event.notifiedAt || new Date().toISOString(),
-  }));
-  const filtered = filterEventsForWebhook(stamped, config, accountBalance, { sortMode: 'latest' });
-  if (!filtered.length) {
-    return { skipped: true, reason: 'filtered_out', evaluated: events?.length || 0 };
-  }
+  })), config, accountBalance);
 
-  const payload = buildWebhookPayload({
-    serviceKey,
-    serviceLabel,
-    events: filtered,
-    providerKey,
-    providerName,
-    accountBalance,
-    source,
-    sortMode: 'latest',
-  });
+  const sniperHits = stamped.filter((event) => event.sniper);
+  let sniperResult = { skipped: true, reason: 'no_sniper_hits' };
 
-  const result = await postAlertWebhook({ config, payload, fetchImpl });
-  if (db) {
-    saveAlertWebhookStatus(db, {
-      lastPushAt: new Date().toISOString(),
-      lastPushSource: source,
-      lastPushOk: Boolean(result?.ok),
-      lastPushItemCount: Number(result?.itemCount || filtered.length || 0),
-      lastPushError: result?.ok ? '' : String(result?.error || result?.reason || ''),
+  // Dedicated high-priority push for sniper countries — not truncated by maxItemsPerPush.
+  if (sniperHits.length && config.sniper.enabled) {
+    const sniperPayload = buildWebhookPayload({
+      serviceKey,
+      serviceLabel,
+      events: sortEventsLatestThenPrice(sniperHits),
+      providerKey,
+      providerName,
+      accountBalance,
+      source: 'sniper',
+      sortMode: 'latest',
+      sniper: true,
     });
+    sniperPayload.note = '狙击命中：有余额平台上的狙击国家补货/上新，请上游优先自动处理';
+    sniperResult = await postAlertWebhook({ config, payload: sniperPayload, fetchImpl });
+    if (db) {
+      saveAlertWebhookStatus(db, {
+        lastPushAt: new Date().toISOString(),
+        lastPushSource: 'sniper',
+        lastPushOk: Boolean(sniperResult?.ok),
+        lastPushItemCount: Number(sniperResult?.itemCount || sniperHits.length || 0),
+        lastPushError: sniperResult?.ok ? '' : String(sniperResult?.error || sniperResult?.reason || ''),
+        lastSniperPushAt: new Date().toISOString(),
+        lastSniperItemCount: sniperHits.length,
+      });
+    }
   }
-  return { ...result, itemCount: filtered.length, evaluated: events?.length || 0 };
+
+  const filtered = filterEventsForWebhook(stamped, config, accountBalance, { sortMode: 'latest' });
+  // Ensure sniper hits still appear in normal batch when they also pass filters.
+  const filteredAnnotated = annotateSniperEvents(filtered, config, accountBalance);
+
+  if (!filteredAnnotated.length && !(sniperHits.length && sniperResult?.ok)) {
+    return {
+      skipped: true,
+      reason: filtered.length ? 'filtered_out' : 'filtered_out',
+      evaluated: events?.length || 0,
+      sniper: sniperResult,
+      sniperHits: sniperHits.length,
+    };
+  }
+
+  let normalResult = { skipped: true, reason: 'no_items' };
+  if (filteredAnnotated.length) {
+    const payload = buildWebhookPayload({
+      serviceKey,
+      serviceLabel,
+      events: filteredAnnotated,
+      providerKey,
+      providerName,
+      accountBalance,
+      source,
+      sortMode: 'latest',
+    });
+
+    normalResult = await postAlertWebhook({ config, payload, fetchImpl });
+    if (db) {
+      saveAlertWebhookStatus(db, {
+        lastPushAt: new Date().toISOString(),
+        lastPushSource: source,
+        lastPushOk: Boolean(normalResult?.ok),
+        lastPushItemCount: Number(normalResult?.itemCount || filteredAnnotated.length || 0),
+        lastPushError: normalResult?.ok ? '' : String(normalResult?.error || normalResult?.reason || ''),
+      });
+    }
+  }
+
+  const ok = Boolean(normalResult?.ok || sniperResult?.ok);
+  return {
+    ok,
+    status: normalResult?.status || sniperResult?.status,
+    itemCount: filteredAnnotated.length,
+    evaluated: events?.length || 0,
+    sniperHits: sniperHits.length,
+    sniper: sniperResult,
+    normal: normalResult,
+    error: ok ? undefined : (normalResult?.error || sniperResult?.error),
+  };
 }
 
 async function pushLatestAlertWebhook({
@@ -474,7 +644,8 @@ async function pushLatestAlertWebhook({
   }
 
   const filtered = filterEventsForWebhook(withBalances, config, null, { sortMode: 'latest' });
-  if (!filtered.length) {
+  const annotated = annotateSniperEvents(filtered, config, null);
+  if (!annotated.length) {
     return {
       ok: false,
       skipped: true,
@@ -490,12 +661,12 @@ async function pushLatestAlertWebhook({
   const payload = buildWebhookPayload({
     serviceKey,
     serviceLabel,
-    events: filtered,
+    events: annotated,
     source: 'manual_latest',
     sortMode: 'latest',
   });
   payload.manual = true;
-  payload.note = `手动推送最近 ${lookbackMinutes} 分钟内、通过过滤的最新 ${filtered.length} 条（优先最新，其次低价）`;
+  payload.note = `手动推送最近 ${lookbackMinutes} 分钟内、通过过滤的最新 ${annotated.length} 条（优先最新，其次低价；狙击国家已打标）`;
   payload.lookbackMinutes = lookbackMinutes;
   payload.evaluated = recent.length;
 
@@ -512,7 +683,7 @@ async function pushLatestAlertWebhook({
     lastPushAt: new Date().toISOString(),
     lastPushSource: 'manual_latest',
     lastPushOk: Boolean(delivery?.ok),
-    lastPushItemCount: Number(delivery?.itemCount || filtered.length || 0),
+    lastPushItemCount: Number(delivery?.itemCount || annotated.length || 0),
     lastPushError: delivery?.ok ? '' : String(delivery?.error || delivery?.reason || ''),
     lastManualPushAt: new Date().toISOString(),
   });
@@ -521,7 +692,8 @@ async function pushLatestAlertWebhook({
     ok: Boolean(delivery?.ok),
     httpStatus: delivery?.status,
     error: delivery?.error,
-    itemCount: filtered.length,
+    itemCount: annotated.length,
+    sniperItemCount: annotated.filter((row) => row.sniper).length,
     evaluated: recent.length,
     lookbackMinutes,
     status,
@@ -532,16 +704,21 @@ async function pushLatestAlertWebhook({
 module.exports = {
   WEBHOOK_SETTING_KEY,
   WEBHOOK_STATUS_KEY,
+  annotateSniperEvents,
   buildSimplifiedWebhookItem,
   buildWebhookPayload,
   defaultWebhookConfig,
   defaultWebhookStatus,
   dispatchAlertWebhook,
+  eventPassesSniperRules,
   eventPassesWebhookFilters,
   filterEventsForWebhook,
   getAlertWebhookConfig,
   getAlertWebhookStatus,
+  isSniperCountryHit,
   loadRecentAlertEvents,
+  normalizeCountryList,
+  normalizeSniperConfig,
   normalizeWebhookConfig,
   postAlertWebhook,
   publicWebhookConfig,

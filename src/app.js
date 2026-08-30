@@ -479,6 +479,7 @@ function createApp({ db, refreshController, countrySyncController, exchangeRateS
         secret: nextSecret,
         timeoutMs: req.body?.timeoutMs,
         filters: req.body?.filters,
+        sniper: req.body?.sniper,
       });
       if (saved.enabled && !saved.url) {
         res.status(400).json({

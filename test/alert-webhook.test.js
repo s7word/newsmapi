@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  annotateSniperEvents,
   buildWebhookPayload,
   eventPassesWebhookFilters,
   filterEventsForWebhook,
@@ -31,6 +32,48 @@ describe('alert-webhook', () => {
 
     const noBalance = filterEventsForWebhook(events, config, { balance: '0', currency: 'USD' });
     expect(noBalance).toEqual([]);
+  });
+
+  it('marks sniper countries and builds sniper payload', () => {
+    const config = normalizeWebhookConfig({
+      enabled: true,
+      url: 'http://example.test/hook',
+      filters: {
+        maxPriceUsd: 1,
+        requireBalance: true,
+        alertTypes: ['restock', 'new_listing'],
+      },
+      sniper: {
+        enabled: true,
+        countries: ['IR', 'IQ'],
+        requireBalance: true,
+        maxPriceUsd: 0.5,
+      },
+    });
+
+    const events = [
+      { type: 'restock', providerKey: 'smsbower', countryIso2: 'IR', minPriceUsd: 0.12 },
+      { type: 'restock', providerKey: 'smsbower', countryIso2: 'US', minPriceUsd: 0.1 },
+      { type: 'new_listing', providerKey: 'smsbower', countryIso2: 'IQ', minPriceUsd: 0.9 },
+    ];
+    const annotated = annotateSniperEvents(events, config, { balance: '10', currency: 'USD' });
+    expect(annotated.filter((row) => row.sniper).map((row) => row.countryIso2)).toEqual(['IR']);
+
+    const payload = buildWebhookPayload({
+      serviceKey: 'telegram',
+      serviceLabel: 'Telegram 接码',
+      providerKey: 'smsbower',
+      providerName: 'SMSBower',
+      accountBalance: { balance: '10', currency: 'USD' },
+      events: annotated.filter((row) => row.sniper),
+      source: 'sniper',
+      sniper: true,
+    });
+    expect(payload.source).toBe('sniper');
+    expect(payload.sniper).toBe(true);
+    expect(payload.items[0].sniper).toBe(true);
+    expect(payload.items[0].tags).toContain('sniper');
+    expect(payload.items[0].priority).toBe('sniper');
   });
 
   it('when truncating, prefers newest alerts over older cheap ones', () => {

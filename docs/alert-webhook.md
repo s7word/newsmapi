@@ -101,8 +101,36 @@ SMSBazaar 在检测到 **Telegram 服务**补货 / 新上架后，除了发 Tele
 5. **平台白名单**：不选=全部；勾选后只推这些平台
 6. **单次最多条数**：默认 50；超出时**优先保留最新通知**（其次低价）
 7. **手动推送最新**：设置页按钮，把最近 N 分钟告警日志中通过过滤的条目合并成一次推送（`source: "manual_latest"`），避免自动推送堆积时程序拿不到最新
+8. **狙击**：前端配置狙击国家；仅有余额（可配）平台命中补货/上新时，立刻单独 POST（`source: "sniper"`），条目带 `sniper:true` / `tags:["sniper"]`，请求头 `X-Smsall-Sniper: 1`
 
 过滤只影响 Webhook，**不影响** Telegram 原文推送。
+
+### 狙击推送示例
+
+```json
+{
+  "schema": "smsall.alert.v1",
+  "source": "sniper",
+  "sniper": true,
+  "sniperItemCount": 1,
+  "note": "狙击命中：有余额平台上的狙击国家补货/上新，请上游优先自动处理",
+  "items": [
+    {
+      "type": "restock",
+      "country": "IR",
+      "priceUsd": 0.12,
+      "provider": "SMSBower",
+      "providerKey": "smsbower",
+      "sniper": true,
+      "tags": ["sniper"],
+      "priority": "sniper",
+      "balance": 24.8
+    }
+  ]
+}
+```
+
+上游建议：若 `payload.sniper === true` 或 `item.sniper === true` 或请求头 `X-Smsall-Sniper: 1`，立即执行自动动作。
 
 ### 手动推送最新
 
