@@ -999,6 +999,82 @@ button.project-link {
   font-size: 0.9rem;
 }
 
+.sniper-targets {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.sniper-targets__header,
+.sniper-targets__row {
+  display: grid;
+  grid-template-columns: 72px minmax(120px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.sniper-targets__header {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  padding: 0 2px;
+}
+
+.sniper-targets__list {
+  display: grid;
+  gap: 8px;
+}
+
+.sniper-targets__empty {
+  color: var(--muted);
+  font-size: 0.86rem;
+  padding: 8px 2px;
+}
+
+.sniper-targets__country,
+.sniper-targets__price {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.sniper-targets__country {
+  text-transform: uppercase;
+  text-align: center;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.sniper-targets__price {
+  max-width: 160px;
+}
+
+.sniper-targets__delete {
+  justify-self: start;
+  color: var(--danger);
+}
+
+.sniper-targets__add {
+  justify-self: start;
+}
+
+@media (max-width: 520px) {
+  .sniper-targets__header,
+  .sniper-targets__row {
+    grid-template-columns: 64px minmax(96px, 1fr) auto;
+    gap: 8px;
+  }
+
+  .sniper-targets__price {
+    max-width: none;
+  }
+}
+
 .webhook-filter-types {
   display: flex;
   flex-wrap: wrap;

@@ -410,17 +410,26 @@ export default function WebhookPushSettings({
             仅有余额平台才狙击（推荐开启）
           </label>
 
-          <div className="telegram-recipient-providers" style={{ marginTop: 8 }}>
-            <div className="telegram-recipient-providers__list">
+          <div className="sniper-targets">
+            <div className="sniper-targets__header" aria-hidden="true">
+              <span>国家</span>
+              <span>最高狙击价 ($)</span>
+              <span />
+            </div>
+            <div className="sniper-targets__list">
+              {sniperTargets.length === 0 ? (
+                <div className="sniper-targets__empty">暂无国家，点击下方添加</div>
+              ) : null}
               {sniperTargets.map((row, index) => (
-                <div key={`sniper-${index}`} className="telegram-recipient-provider" style={{ gap: 8, alignItems: 'center' }}>
+                <div key={`sniper-${index}`} className="sniper-targets__row">
                   <input
+                    className="sniper-targets__country"
                     type="text"
                     value={row.country}
                     disabled={!sniperEnabled}
                     maxLength={2}
                     placeholder="IR"
-                    style={{ width: 64, textTransform: 'uppercase' }}
+                    aria-label={`狙击国家 ${index + 1}`}
                     onChange={(event) => {
                       const value = event.target.value.toUpperCase();
                       setSniperTargets((current) => current.map((item, i) => (
@@ -428,15 +437,15 @@ export default function WebhookPushSettings({
                       )));
                     }}
                   />
-                  <span>最高狙击价 $</span>
                   <input
+                    className="sniper-targets__price"
                     type="number"
                     min="0"
                     step="0.01"
                     value={row.maxPriceUsd}
                     disabled={!sniperEnabled}
                     placeholder="0.9"
-                    style={{ width: 96 }}
+                    aria-label={`${row.country || '国家'} 最高狙击价`}
                     onChange={(event) => {
                       const value = event.target.value;
                       setSniperTargets((current) => current.map((item, i) => (
@@ -446,7 +455,7 @@ export default function WebhookPushSettings({
                   />
                   <button
                     type="button"
-                    className="ghost-button"
+                    className="ghost-button sniper-targets__delete"
                     disabled={!sniperEnabled}
                     onClick={() => {
                       setSniperTargets((current) => current.filter((_, i) => i !== index));
@@ -459,9 +468,8 @@ export default function WebhookPushSettings({
             </div>
             <button
               type="button"
-              className="ghost-button"
+              className="ghost-button sniper-targets__add"
               disabled={!sniperEnabled}
-              style={{ marginTop: 8 }}
               onClick={() => {
                 setSniperTargets((current) => [...current, { country: '', maxPriceUsd: '' }]);
               }}
