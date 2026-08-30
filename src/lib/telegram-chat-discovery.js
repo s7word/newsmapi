@@ -1,0 +1,158 @@
+'use strict';
+
+const TELEGRAM_API_ROOT = 'https://api.telegram.org';
+const {
+  addTelegramRecipient,
+  resolveTelegramNotifyChatId,
+  resolveTelegramNotifyChatIds,
+  LEGACY_CHAT_SETTING,
+} = require('./telegram-recipients');
+
+function getTelegramBotToken() {
+  return String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+}
+
+async function fetchTelegramUpdates(botToken, offset = 0, longPollSeconds = 0) {
+  const token = String(botToken || '').trim();
+  if (!token) return { ok: false, result: [] };
+
+  const params = new URLSearchParams();
+  if (offset > 0) params.set('offset', String(offset));
+  const timeout = Math.min(50, Math.max(0, Number(longPollSeconds || 0)));
+  params.set('timeout', String(timeout));
+  params.set('allowed_updates', JSON.stringify(['message', 'channel_post', 'my_chat_member']));
+
+  const url = `${TELEGRAM_API_ROOT}/bot${token}/getUpdates?${params.toString()}`;
+  const response = await fetch(url, { signal: AbortSignal.timeout((timeout + 15) * 1000) });
+  const body = await response.text();
+  let payload = {};
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    payload = { ok: false, description: body.slice(0, 200) };
+  }
+  return payload;
+}
+
+function pickChatIdFromUpdates(updates = []) {
+  let best = null;
+  for (const update of updates) {
+    const chat =
+      update?.message?.chat ||
+      update?.channel_post?.chat ||
+      update?.my_chat_member?.chat;
+    if (!chat?.id) continue;
+    const updateId = Number(update.update_id || 0);
+    if (!best || updateId >= best.updateId) {
+      best = { chatId: String(chat.id), updateId, chatType: chat.type || '' };
+    }
+  }
+  return best;
+}
+
+async function discoverTelegramNotifyChatId({
+  db,
+  getSetting,
+  setSetting,
+  botToken = getTelegramBotToken(),
+  longPollSeconds = 0,
+}) {
+  const token = String(botToken || '').trim();
+  if (!token) return { discovered: false, reason: 'no_token' };
+
+  const existing = resolveTelegramNotifyChatIds(db, getSetting, setSetting);
+  if (existing.length) {
+    return { discovered: true, chatId: existing[0], source: 'configured' };
+  }
+
+  const payload = await fetchTelegramUpdates(token, 0, longPollSeconds);
+  if (!payload?.ok) {
+    return { discovered: false, reason: payload?.description || 'getUpdates_failed' };
+  }
+
+  const picked = pickChatIdFromUpdates(payload.result || []);
+  if (!picked?.chatId) {
+    return { discovered: false, reason: 'no_messages' };
+  }
+
+  if (db && setSetting) {
+    addTelegramRecipient(db, getSetting, setSetting, {
+      chatId: picked.chatId,
+      label: picked.chatType === 'private' ? '自动发现' : `自动发现 (${picked.chatType})`,
+    });
+  }
+
+  const nextOffset = picked.updateId + 1;
+  await fetchTelegramUpdates(token, nextOffset);
+
+  return {
+    discovered: true,
+    chatId: picked.chatId,
+    chatType: picked.chatType,
+    source: 'getUpdates',
+  };
+}
+
+function startTelegramChatDiscovery({
+  db,
+  getSetting,
+  setSetting,
+  sendTelegramMessage,
+  pollIntervalMs = Number(process.env.TELEGRAM_CHAT_DISCOVERY_INTERVAL_MS || 30000),
+  botToken = getTelegramBotToken(),
+}) {
+  const token = String(botToken || '').trim();
+  if (!token) return { stop: () => {} };
+
+  let stopped = false;
+  let timer = null;
+  let inFlight = false;
+
+  async function poll() {
+    if (stopped || inFlight) return;
+    inFlight = true;
+    try {
+      const result = await discoverTelegramNotifyChatId({ db, getSetting, setSetting, botToken: token });
+      if (result.discovered && result.source === 'getUpdates' && sendTelegramMessage) {
+        const chatId = result.chatId;
+        try {
+          await sendTelegramMessage({
+            botToken: token,
+            chatId,
+            text: '✅ SMSBazaar 告警已连接。将向本聊天推送 Telegram 接码补货 / 上新通知。',
+          });
+        } catch (error) {
+          console.warn(`Telegram welcome message failed: ${error.message}`);
+        }
+        console.log(`Telegram notify chat id discovered: ${chatId} (${result.chatType || 'unknown'})`);
+        stopped = true;
+        if (timer) clearInterval(timer);
+      }
+    } catch (error) {
+      console.warn(`Telegram chat discovery failed: ${error.message}`);
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  poll();
+  timer = setInterval(poll, pollIntervalMs);
+
+  return {
+    stop: () => {
+      stopped = true;
+      if (timer) clearInterval(timer);
+    },
+  };
+}
+
+module.exports = {
+  LEGACY_CHAT_SETTING,
+  discoverTelegramNotifyChatId,
+  fetchTelegramUpdates,
+  getTelegramBotToken,
+  pickChatIdFromUpdates,
+  resolveTelegramNotifyChatId,
+  resolveTelegramNotifyChatIds,
+  startTelegramChatDiscovery,
+};
