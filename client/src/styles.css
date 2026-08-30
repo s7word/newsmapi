@@ -999,30 +999,54 @@ button.project-link {
   font-size: 0.9rem;
 }
 
+/* Toggle labels inside filter cards must not inherit form label grid stacking. */
+.webhook-filters .telegram-recipient-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+}
+
+.webhook-filters .telegram-recipient-toggle input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
 .sniper-targets {
   display: grid;
   gap: 8px;
   margin-top: 4px;
+  justify-items: start;
 }
 
 .sniper-targets__header,
 .sniper-targets__row {
   display: grid;
-  grid-template-columns: 72px minmax(120px, 1fr) auto;
+  grid-template-columns: 72px 140px auto;
   gap: 10px;
   align-items: center;
+  width: max-content;
+  max-width: 100%;
 }
 
 .sniper-targets__header {
   color: var(--muted);
   font-size: 0.78rem;
   letter-spacing: 0.02em;
-  padding: 0 2px;
+  padding: 0;
+}
+
+.sniper-targets__header > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sniper-targets__list {
   display: grid;
   gap: 8px;
+  justify-items: start;
 }
 
 .sniper-targets__empty {
@@ -1031,16 +1055,24 @@ button.project-link {
   padding: 8px 2px;
 }
 
+.webhook-settings-form .sniper-targets__country,
+.webhook-settings-form .sniper-targets__price,
 .sniper-targets__country,
 .sniper-targets__price {
-  width: 100%;
+  box-sizing: border-box;
   min-width: 0;
+  width: 72px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
   color: var(--text);
   padding: 8px 10px;
   font: inherit;
+}
+
+.webhook-settings-form .sniper-targets__price,
+.sniper-targets__price {
+  width: 140px;
 }
 
 .sniper-targets__country {
@@ -1050,13 +1082,10 @@ button.project-link {
   font-weight: 700;
 }
 
-.sniper-targets__price {
-  max-width: 160px;
-}
-
 .sniper-targets__delete {
   justify-self: start;
   color: var(--danger);
+  white-space: nowrap;
 }
 
 .sniper-targets__add {
@@ -1066,12 +1095,18 @@ button.project-link {
 @media (max-width: 520px) {
   .sniper-targets__header,
   .sniper-targets__row {
-    grid-template-columns: 64px minmax(96px, 1fr) auto;
+    grid-template-columns: 64px 112px auto;
     gap: 8px;
   }
 
+  .webhook-settings-form .sniper-targets__country,
+  .sniper-targets__country {
+    width: 64px;
+  }
+
+  .webhook-settings-form .sniper-targets__price,
   .sniper-targets__price {
-    max-width: none;
+    width: 112px;
   }
 }
 

@@ -414,7 +414,7 @@ export default function WebhookPushSettings({
             <div className="sniper-targets__header" aria-hidden="true">
               <span>国家</span>
               <span>最高狙击价 ($)</span>
-              <span />
+              <span>操作</span>
             </div>
             <div className="sniper-targets__list">
               {sniperTargets.length === 0 ? (
