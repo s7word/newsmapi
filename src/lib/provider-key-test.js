@@ -469,6 +469,26 @@ function buildConnectivityFromResult(result) {
   };
 }
 
+async function testFangyuanSms(apiKey) {
+  const { getUserInfo } = require('./providers/fangyuan-sms');
+  const info = await getUserInfo(apiKey);
+  const integral = info.integral;
+  const balanceCny = info.balanceCny;
+  const integralText = integral != null ? ` · 积分 ${integral}` : '';
+  const cnyText = balanceCny != null ? ` ≈ ¥${balanceCny.toFixed(2)}` : '';
+  return {
+    message: `连接成功 · clientId ${info.credentials.clientId}${integralText}${cnyText}`,
+    details: {
+      balance: balanceCny != null ? String(balanceCny) : (integral != null ? String(integral) : undefined),
+      currency: balanceCny != null ? 'CNY' : (integral != null ? 'POINTS' : undefined),
+      integral: integral != null ? String(integral) : undefined,
+      freezeIntegral: info.freezeIntegral != null ? String(info.freezeIntegral) : undefined,
+      clientId: info.credentials.clientId,
+    },
+    endpoint: 'POST /api/openApi/userInfo',
+  };
+}
+
 async function testProviderKey(providerKey, apiKey) {
   const definition = getProviderDefinition(providerKey);
   if (!definition) {
@@ -547,6 +567,9 @@ async function testProviderKey(providerKey, apiKey) {
       break;
     case 'smstg':
       result = await testSmstg(definition.baseUrl, trimmedKey);
+      break;
+    case 'fangyuan-sms':
+      result = await testFangyuanSms(trimmedKey);
       break;
     default:
       throw new Error(`暂不支持测试: ${providerKey}`);

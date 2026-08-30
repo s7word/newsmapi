@@ -36,4 +36,12 @@ describe('resolvePortalUrl', () => {
     expect(getsms.keyPlaceholder).toMatch(/@/);
     expect(getsms.publicWithoutKey).toBe(false);
   });
+
+  it('documents FangyuanSms clientId|apiKey configuration in the catalog', () => {
+    const fangyuan = getProviderDefinition('fangyuan-sms');
+    expect(fangyuan.settingsHint).toMatch(/clientId\|apiKey/);
+    expect(fangyuan.keyPlaceholder).toMatch(/\|/);
+    expect(fangyuan.publicWithoutKey).toBe(false);
+    expect(resolvePortalUrl(fangyuan)).toMatch(/getfangyuan\.com/);
+  });
 });

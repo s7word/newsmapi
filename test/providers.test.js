@@ -688,4 +688,44 @@ describe('provider adapters', () => {
     if (previousUser === undefined) delete process.env.GETSMS_USER;
     else process.env.GETSMS_USER = previousUser;
   });
+
+  it('parses FangyuanSms getPrice points into a CNY global offer', async () => {
+    const previousClient = process.env.FANGYUAN_CLIENT_ID;
+    delete process.env.FANGYUAN_CLIENT_ID;
+    const { fetchProviderOffers, resolveCredentials, pointsToCny } = await import('../src/lib/providers/fangyuan-sms');
+    expect(() => resolveCredentials('only-a-key')).toThrow(/clientId\|apiKey/);
+    expect(pointsToCny(160)).toBe(1.6);
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => JSON.stringify({
+        code: 0,
+        msg: 'success',
+        data: [{ pid: 5, price: 160 }],
+      }),
+    });
+
+    const result = await fetchProviderOffers({
+      mapping: {
+        providerKey: 'fangyuan-sms',
+        displayName: 'FangyuanSms',
+        serviceCode: '5',
+        baseUrl: 'http://www.getfangyuan.com:8818',
+      },
+      exchangeRateService,
+      apiKey: '10111|test-key',
+    });
+
+    expect(result.error).toBe('');
+    expect(result.offers).toHaveLength(1);
+    expect(result.offers[0].currency).toBe('CNY');
+    expect(result.offers[0].minPriceOriginal).toBe(1.6);
+    expect(result.offers[0].inventoryTotal).toBe(1);
+    expect(result.offers[0].metadata.productId).toBe(5);
+    expect(result.offers[0].metadata.pricePoints).toBe(160);
+    if (previousClient === undefined) delete process.env.FANGYUAN_CLIENT_ID;
+    else process.env.FANGYUAN_CLIENT_ID = previousClient;
+  });
 });

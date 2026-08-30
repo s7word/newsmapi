@@ -10,7 +10,8 @@ describe('provider alert codes', () => {
     expect(getProviderAlertCode('hero-sms')).toBe('P01');
     expect(getProviderAlertCode('smsbower')).toBe('P02');
     expect(getProviderAlertCode('5sim')).toBe('P03');
-    expect(getProviderAlertCode('smstg')).toBe(`P${String(PROVIDERS.length).padStart(2, '0')}`);
+    expect(getProviderAlertCode('smstg')).toBe(`P${String(PROVIDERS.length - 1).padStart(2, '0')}`);
+    expect(getProviderAlertCode('fangyuan-sms')).toBe(`P${String(PROVIDERS.length).padStart(2, '0')}`);
     expect(getProviderAlertCode('unknown-platform')).toBe('');
   });
 

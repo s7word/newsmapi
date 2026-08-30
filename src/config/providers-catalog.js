@@ -212,6 +212,17 @@ const PROVIDERS = [
     publicWithoutKey: true,
     minRefreshIntervalMs: Number(process.env.SMSTG_REFRESH_INTERVAL_MS || 300000),
   },
+  {
+    providerKey: 'fangyuan-sms',
+    displayName: 'FangyuanSms',
+    baseUrl: 'http://www.getfangyuan.com:8818',
+    portalUrl: 'http://www.getfangyuan.com',
+    keyEnv: 'FANGYUAN_SMS_API_KEY',
+    publicWithoutKey: false,
+    settingsHint: '必须同时提供用户 ID 与 API Key：设置里填 clientId|apiKey（例 10111|密钥），或环境变量 FANGYUAN_CLIENT_ID。价格接口为 getPrice（积分/分），端口 8818/8858/8868 自动切换。',
+    keyPlaceholder: '10111|API密钥',
+    minRefreshIntervalMs: Number(process.env.FANGYUAN_SMS_REFRESH_INTERVAL_MS || 180000),
+  },
 ];
 
 function listProviders() {

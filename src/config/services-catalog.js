@@ -33,6 +33,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'dr',
     simsms: 'opt132',
     getsms: 'OpenAI',
+    'fangyuan-sms': '127',
   },
   telegram: {
     onlinesim: 'telegram',
@@ -52,6 +53,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'tg',
     simsms: 'opt29',
     getsms: 'Telegram',
+    'fangyuan-sms': '5',
   },
   whatsapp: {
     onlinesim: 'whatsapp',
@@ -70,6 +72,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'wa',
     simsms: 'opt20',
     getsms: 'WhatsApp',
+    'fangyuan-sms': '2',
   },
   google: {
     onlinesim: 'google',
@@ -88,6 +91,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'go',
     simsms: 'opt1',
     getsms: 'Google',
+    'fangyuan-sms': '6',
   },
   discord: {
     onlinesim: 'discord',
@@ -106,6 +110,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'ds',
     simsms: 'opt45',
     getsms: 'Discord',
+    'fangyuan-sms': '67',
   },
   microsoft: {
     onlinesim: 'microsoft',
@@ -124,6 +129,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'mm',
     simsms: 'opt15',
     getsms: 'Microsoft',
+    'fangyuan-sms': '23',
   },
   twitter: {
     onlinesim: 'twitter',
@@ -142,6 +148,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'tw',
     simsms: 'opt41',
     getsms: 'Twitter',
+    'fangyuan-sms': '22',
   },
   instagram: {
     onlinesim: 'instagram',
@@ -160,6 +167,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'ig',
     simsms: 'opt16',
     getsms: 'Instagram',
+    'fangyuan-sms': '24',
   },
   facebook: {
     onlinesim: '3223',
@@ -178,6 +186,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'fb',
     simsms: 'opt2',
     getsms: 'Facebook',
+    'fangyuan-sms': '7',
   },
   tiktok: {
     onlinesim: 'tiktok',
@@ -196,6 +205,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'lf',
     simsms: 'opt104',
     getsms: 'TikTok',
+    'fangyuan-sms': '126',
   },
   amazon: {
     onlinesim: 'amazon',
@@ -214,6 +224,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'am',
     simsms: 'opt44',
     getsms: 'Amazon',
+    'fangyuan-sms': '31',
   },
   apple: {
     onlinesim: 'apple',
@@ -232,6 +243,7 @@ const EXTENDED_PROVIDER_CODES = {
     pvapins: 'wx',
     simsms: 'opt131',
     getsms: 'Apple',
+    'fangyuan-sms': '42',
   },
 };
 

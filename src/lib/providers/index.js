@@ -24,6 +24,7 @@ const simsms = require('./simsms');
 const getsms = require('./getsms');
 const tigerSms = require('./tiger-sms');
 const smstg = require('./smstg');
+const fangyuanSms = require('./fangyuan-sms');
 
 const providers = {
   'hero-sms': heroSms,
@@ -50,6 +51,7 @@ const providers = {
   getsms,
   'tiger-sms': tigerSms,
   smstg,
+  'fangyuan-sms': fangyuanSms,
 };
 
 function getProvider(providerKey) {

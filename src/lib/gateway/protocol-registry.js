@@ -153,6 +153,7 @@ const PROVIDER_PROTOCOL = {
   getsms: 'getsms-command',
   'tiger-sms': 'activate-handler',
   smstg: 'smstg-account-api',
+  'fangyuan-sms': 'snapshot-only',
 };
 
 const ACTIVATE_ACTIONS = new Set([

@@ -22,6 +22,13 @@
 - **GetSMS** 必须 `GETSMS_USER` + Key，或设置里 `user|api_key`；只填 Key 会 Unauthorized。
 - 打开 SQLite 时会删除不在 `providers-catalog.js` 的 `provider_states` / `provider_snapshots`（例如历史 `sms-activate` 孤儿行）。
 
+### FangyuanSms
+
+- API 根：`http://www.getfangyuan.com:{8818|8858|8868}/api/openApi`（端口自动故障切换）。
+- 鉴权：`clientId`（数字用户 ID）+ `apiKey`；设置填写 `clientId|apiKey`，或 `FANGYUAN_CLIENT_ID` + `FANGYUAN_SMS_API_KEY`。
+- 查询：`userInfo`（积分余额）、`getPrice`（按 product_id 查价；积分按 1 积分=0.01 CNY 换算）。当前账号侧报价多为产品统一价，无分国家库存字段。
+- 产品映射见 `services-catalog.js`（Telegram=`5`，OpenAI=`127` 等）。
+
 ### SMSTG
 
 - API 根：`https://smstg.org/api`（`getBalance` / `buy` / `getOtp`）。
