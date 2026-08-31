@@ -101,7 +101,18 @@ SMSBazaar 在检测到 **Telegram 服务**补货 / 新上架后，除了发 Tele
 5. **平台白名单**：不选=全部；勾选后只推这些平台
 6. **单次最多条数**：默认 50；超出时**优先保留最新通知**（其次低价）
 7. **手动推送最新**：设置页按钮，把最近 N 分钟告警日志中通过过滤的条目合并成一次推送（`source: "manual_latest"`），避免自动推送堆积时程序拿不到最新
-8. **狙击对应表**：每个国家单独设最高狙击价（如 `IR≤0.9`、`IQ≤1.8`）。≤ 该价打 `sniper` 并立即优先推送；**超过仍通知但不打狙击标签**（上游勿自动动作）。
+8. **狙击对应表**：每个国家单独设最高狙击价（如 `IR≤0.9`、`IQ≤1.8`）。≤ **该档位价** 打 `sniper` 并立即优先推送；**超过仍通知但不打狙击标签**（上游勿自动动作）。
+
+### 供应商档位（providerRef）
+
+对 SMSBower（`agent_ids`）、5SIM、SMSPool 等带 `providerRef` 的平台，补货/上新按 **供应商 + 价位** 分别检测与推送，不再只报国家汇总最低价。
+
+Webhook 条目新增：
+
+- `providerRef`：供应商 ID（多个时用逗号拼接，如 `"2579,3330"`）
+- `supplierIds`：数组形式，便于下单时传 `providerIds`
+- `tierKey`：内部档位键（`providerRef|price`）
+- `priceUsd`：该档位价格（狙击与过滤均按此价，而非国家最低价）
 
 过滤只影响 Webhook，**不影响** Telegram 原文推送。
 
@@ -118,6 +129,9 @@ SMSBazaar 在检测到 **Telegram 服务**补货 / 新上架后，除了发 Tele
       "type": "restock",
       "country": "IR",
       "priceUsd": 0.12,
+      "providerRef": "3193",
+      "supplierIds": ["3193"],
+      "tierKey": "3193|0.12",
       "sniper": true,
       "sniperWatched": true,
       "sniperMaxPriceUsd": 0.9,

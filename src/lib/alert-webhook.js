@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const { parseSupplierIds } = require('./offer-diff');
 const { getSetting, setSetting } = require('./settings');
 const { getProviderDefinition, resolvePortalUrl } = require('../config/providers-catalog');
 const { getProviderAlertCode } = require('../config/provider-alert-codes');
@@ -398,6 +399,11 @@ function buildSimplifiedWebhookItem(event, {
     provider: String(providerName || event.providerName || ''),
     providerKey: String(event.providerKey || ''),
     providerCode: String(alertCode || ''),
+    providerRef: String(event.providerRef || '').trim(),
+    supplierIds: Array.isArray(event.supplierIds) && event.supplierIds.length
+      ? event.supplierIds.map((id) => String(id))
+      : parseSupplierIds(event.providerRef),
+    tierKey: String(event.tierKey || '').trim(),
     balance,
     balanceCurrency: accountBalance?.currency || 'USD',
     portalUrl: String(portalUrl || ''),
@@ -605,6 +611,9 @@ function loadRecentAlertEvents(db, {
       minPriceUsd: Number(payload.minPriceUsd),
       minPriceOriginal: Number(payload.minPriceOriginal || payload.minPriceUsd || 0),
       currency: payload.currency || 'USD',
+      providerRef: String(payload.providerRef || '').trim(),
+      supplierIds: Array.isArray(payload.supplierIds) ? payload.supplierIds : parseSupplierIds(payload.providerRef),
+      tierKey: String(payload.tierKey || '').trim(),
       notifiedAt: row.notified_at,
       alertLogId: row.id,
     };

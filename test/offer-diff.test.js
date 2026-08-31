@@ -148,4 +148,117 @@ describe('offer-diff', () => {
     });
     expect(events).toEqual([]);
   });
+
+  it('diffs per supplier tier when providerRef is present', async () => {
+    const mod = await loadDiffModule();
+    const smsbowerOffer = (tiers, overrides = {}) => baseOffer({
+      providerKey: 'smsbower',
+      providerName: 'SMSBower',
+      countryIso2: 'IQ',
+      countryName: 'Iraq',
+      inventoryTotal: tiers.reduce((sum, tier) => sum + tier.stock, 0),
+      minPriceUsd: tiers[0]?.priceUsd ?? 0,
+      minPriceOriginal: tiers[0]?.priceOriginal ?? 0,
+      tiers,
+      ...overrides,
+    });
+
+    const events = mod.diffProviderOffers({
+      providerKey: 'smsbower',
+      providerName: 'SMSBower',
+      previousOffers: [
+        smsbowerOffer([
+          { priceUsd: 0.283, priceOriginal: 0.283, stock: 100, providerRef: '3193' },
+          { priceUsd: 0.794, priceOriginal: 0.794, stock: 50, providerRef: '3451' },
+        ]),
+      ],
+      newOffers: [
+        smsbowerOffer([
+          { priceUsd: 0.283, priceOriginal: 0.283, stock: 100, providerRef: '3193' },
+          { priceUsd: 0.794, priceOriginal: 0.794, stock: 80, providerRef: '3451' },
+        ]),
+      ],
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'restock',
+      countryIso2: 'IQ',
+      providerRef: '3451',
+      supplierIds: ['3451'],
+      previousStock: 50,
+      newStock: 80,
+      minPriceUsd: 0.794,
+    });
+  });
+
+  it('emits separate restocks for multiple supplier tiers in one refresh', async () => {
+    const mod = await loadDiffModule();
+    const offer = (tiers) => baseOffer({
+      providerKey: 'smsbower',
+      countryIso2: 'IQ',
+      inventoryTotal: tiers.reduce((sum, tier) => sum + tier.stock, 0),
+      tiers,
+    });
+    const events = mod.diffProviderOffers({
+      providerKey: 'smsbower',
+      providerName: 'SMSBower',
+      previousOffers: [
+        offer([
+          { priceUsd: 0.283, priceOriginal: 0.283, stock: 10, providerRef: '3193' },
+          { priceUsd: 1, priceOriginal: 1, stock: 0, providerRef: '2579' },
+        ]),
+      ],
+      newOffers: [
+        offer([
+          { priceUsd: 0.283, priceOriginal: 0.283, stock: 20, providerRef: '3193' },
+          { priceUsd: 1, priceOriginal: 1, stock: 5, providerRef: '2579' },
+        ]),
+      ],
+    });
+
+    expect(events).toHaveLength(2);
+    expect(events.map((event) => event.providerRef).sort()).toEqual(['2579', '3193']);
+    expect(events.find((event) => event.providerRef === '2579')).toMatchObject({
+      type: 'restock',
+      minPriceUsd: 1,
+      previousStock: 0,
+      newStock: 5,
+    });
+  });
+
+  it('uses tier price for sniper accuracy instead of country minimum', async () => {
+    const mod = await loadDiffModule();
+    const events = mod.diffProviderOffers({
+      providerKey: 'smsbower',
+      providerName: 'SMSBower',
+      previousOffers: [
+        baseOffer({
+          providerKey: 'smsbower',
+          countryIso2: 'IQ',
+          inventoryTotal: 100,
+          tiers: [
+            { priceUsd: 0.283, priceOriginal: 0.283, stock: 100, providerRef: '3193' },
+            { priceUsd: 1, priceOriginal: 1, stock: 0, providerRef: '2579' },
+          ],
+        }),
+      ],
+      newOffers: [
+        baseOffer({
+          providerKey: 'smsbower',
+          countryIso2: 'IQ',
+          inventoryTotal: 105,
+          minPriceUsd: 0.283,
+          tiers: [
+            { priceUsd: 0.283, priceOriginal: 0.283, stock: 100, providerRef: '3193' },
+            { priceUsd: 1, priceOriginal: 1, stock: 5, providerRef: '2579' },
+          ],
+        }),
+      ],
+    });
+
+    const expensiveTier = events.find((event) => event.providerRef === '2579');
+    expect(expensiveTier?.minPriceUsd).toBe(1);
+    expect(expensiveTier?.minPriceUsd).not.toBe(0.283);
+  });
 });

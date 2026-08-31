@@ -131,12 +131,16 @@ function formatInventoryAlertLines(events, options = {}) {
     const priceUsd = Number(event.minPriceUsd || 0);
     const currency = escapeHtml(event.currency || 'USD');
     const priceLine = priceUsd > 0 ? `$${priceUsd.toFixed(4)} ${currency}` : '—';
+    const supplierRef = String(event.providerRef || '').trim();
+    const supplierLine = supplierRef ? `供应商：#${escapeHtml(supplierRef)}` : null;
+    const priceLabel = supplierRef ? '档位价' : '最低价';
     return [
       `<b>${typeLabel}</b>`,
       `国家：${country} (${iso2})`,
+      supplierLine,
       `库存：${stockLine}`,
-      `最低价：${priceLine}`,
-    ].join('\n');
+      `${priceLabel}：${priceLine}`,
+    ].filter(Boolean).join('\n');
   });
 
   return [header.join('\n'), '━━━━━━━━━━━━━━', ...lines].filter(Boolean).join('\n\n');

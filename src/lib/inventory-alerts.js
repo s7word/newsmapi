@@ -115,16 +115,24 @@ function parseRestockCooldownMs(raw = process.env.TELEGRAM_ALERT_RESTOCK_COOLDOW
   return value;
 }
 
+function tierDedupeSuffix(event) {
+  const ref = String(event.providerRef || '').trim();
+  if (!ref) return '';
+  const price = Number(event.minPriceOriginal ?? event.minPriceUsd ?? 0);
+  return `:${ref}:${Number.isFinite(price) ? price : 0}`;
+}
+
 function buildDedupeKey(serviceKey, event, cooldownMs) {
+  const tier = tierDedupeSuffix(event);
   if (event.type === 'new_listing') {
-    return `${serviceKey}:${event.providerKey}:${event.countryIso2}:new_listing`;
+    return `${serviceKey}:${event.providerKey}:${event.countryIso2}${tier}:new_listing`;
   }
   // Optional anti-flap only. cooldownMs <= 0 must not divide by zero (Infinity bucket).
   if (Number.isFinite(cooldownMs) && cooldownMs > 0) {
     const bucket = Math.floor(Date.now() / cooldownMs);
-    return `${serviceKey}:${event.providerKey}:${event.countryIso2}:restock:${bucket}`;
+    return `${serviceKey}:${event.providerKey}:${event.countryIso2}${tier}:restock:${bucket}`;
   }
-  return `${serviceKey}:${event.providerKey}:${event.countryIso2}:restock:${event.previousStock}-${event.newStock}-${Date.now()}`;
+  return `${serviceKey}:${event.providerKey}:${event.countryIso2}${tier}:restock:${event.previousStock}-${event.newStock}-${Date.now()}`;
 }
 
 function createInventoryAlertService({ db }) {
@@ -164,12 +172,12 @@ function createInventoryAlertService({ db }) {
     });
 
     const pending = [];
-    const seenRestockCountries = new Set();
+    const seenRestockKeys = new Set();
     for (const event of events) {
       if (event.type === 'restock') {
-        const countryKey = `${event.providerKey}:${event.countryIso2}`;
-        if (seenRestockCountries.has(countryKey)) continue;
-        seenRestockCountries.add(countryKey);
+        const restockKey = `${event.providerKey}:${event.countryIso2}${tierDedupeSuffix(event)}`;
+        if (seenRestockKeys.has(restockKey)) continue;
+        seenRestockKeys.add(restockKey);
       }
 
       const dedupeKey = buildDedupeKey(serviceKey, event, restockCooldownMs);

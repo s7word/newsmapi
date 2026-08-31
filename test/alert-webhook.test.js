@@ -91,6 +91,72 @@ describe('alert-webhook', () => {
     expect(payload.items[0].priority).toBe('sniper');
   });
 
+  it('includes supplier tier fields in webhook items', () => {
+    const payload = buildWebhookPayload({
+      serviceKey: 'telegram',
+      serviceLabel: 'Telegram 接码',
+      providerKey: 'smsbower',
+      providerName: 'SMSBower',
+      events: [{
+        type: 'restock',
+        providerKey: 'smsbower',
+        countryIso2: 'IQ',
+        countryName: 'Iraq',
+        previousStock: 50,
+        newStock: 80,
+        minPriceUsd: 0.794,
+        minPriceOriginal: 0.794,
+        currency: 'USD',
+        providerRef: '3451',
+        supplierIds: ['3451'],
+        tierKey: '3451|0.794',
+      }],
+      source: 'auto',
+    });
+
+    expect(payload.items[0]).toMatchObject({
+      country: 'IQ',
+      priceUsd: 0.794,
+      providerRef: '3451',
+      supplierIds: ['3451'],
+      tierKey: '3451|0.794',
+    });
+  });
+
+  it('marks expensive supplier tier as sniper over-price independently from cheap tiers', () => {
+    const config = normalizeWebhookConfig({
+      enabled: true,
+      url: 'http://example.test/hook',
+      sniper: {
+        enabled: true,
+        targets: [{ country: 'IQ', maxPriceUsd: 1.8 }],
+        requireBalance: false,
+      },
+    });
+    const events = [
+      {
+        type: 'restock',
+        providerKey: 'smsbower',
+        countryIso2: 'IQ',
+        minPriceUsd: 0.794,
+        providerRef: '3451',
+      },
+      {
+        type: 'restock',
+        providerKey: 'smsbower',
+        countryIso2: 'IQ',
+        minPriceUsd: 2.1,
+        providerRef: '2579',
+      },
+    ];
+    const annotated = annotateSniperEvents(events, config, { balance: '10', currency: 'USD' });
+    expect(annotated.find((row) => row.providerRef === '3451')).toMatchObject({ sniper: true });
+    expect(annotated.find((row) => row.providerRef === '2579')).toMatchObject({
+      sniper: false,
+      sniperOverPrice: true,
+    });
+  });
+
   it('when truncating, prefers newest alerts over older cheap ones', () => {
     const config = normalizeWebhookConfig({
       enabled: true,
