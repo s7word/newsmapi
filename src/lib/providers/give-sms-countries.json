@@ -1,0 +1,522 @@
+{
+  "kazakhstan": {
+    "activateId": "2",
+    "label": "Kazakhstan"
+  },
+  "england": {
+    "activateId": "16",
+    "label": "United Kingdom"
+  },
+  "canada": {
+    "activateId": "36",
+    "label": "Canada"
+  },
+  "germany": {
+    "activateId": "43",
+    "label": "Germany"
+  },
+  "usavirt": {
+    "activateId": "12",
+    "label": "United States of America"
+  },
+  "brazil": {
+    "activateId": "73",
+    "label": "Brazil"
+  },
+  "estonia": {
+    "activateId": "34",
+    "label": "Estonia"
+  },
+  "france": {
+    "activateId": "78",
+    "label": "France"
+  },
+  "indonesia": {
+    "activateId": "6",
+    "label": "Indonesia"
+  },
+  "kyrgyzstan": {
+    "activateId": "11",
+    "label": "Kyrgyzstan"
+  },
+  "laos": {
+    "activateId": "25",
+    "label": "Lao People's Democratic Republic"
+  },
+  "lithuania": {
+    "activateId": "44",
+    "label": "Lithuania"
+  },
+  "netherlands": {
+    "activateId": "48",
+    "label": "Netherlands"
+  },
+  "poland": {
+    "activateId": "15",
+    "label": "Poland"
+  },
+  "romania": {
+    "activateId": "32",
+    "label": "Romania"
+  },
+  "sweden": {
+    "activateId": "46",
+    "label": "Sweden"
+  },
+  "indiia": {
+    "activateId": "22",
+    "label": "India"
+  },
+  "malaiziia": {
+    "activateId": "7",
+    "label": "Malaysia"
+  },
+  "vetnam": {
+    "activateId": "10",
+    "label": "Vietnam"
+  },
+  "filippiny": {
+    "activateId": "4",
+    "label": "Philippines"
+  },
+  "turtsiia": {
+    "activateId": "62",
+    "label": "Turkey"
+  },
+  "moldova": {
+    "activateId": "85",
+    "label": "Moldova"
+  },
+  "uzbekistan": {
+    "activateId": "40",
+    "label": "Uzbekistan"
+  },
+  "gruziia": {
+    "activateId": "128",
+    "label": "Georgia"
+  },
+  "irlandiia": {
+    "activateId": "23",
+    "label": "Ireland"
+  },
+  "portugaliia": {
+    "activateId": "117",
+    "label": "Portugal"
+  },
+  "ispaniia": {
+    "activateId": "56",
+    "label": "Spain"
+  },
+  "chekhiia": {
+    "activateId": "63",
+    "label": "Czech Republic"
+  },
+  "bangladesh": {
+    "activateId": "60",
+    "label": "Bangladesh"
+  },
+  "ssha": {
+    "activateId": "187",
+    "label": "United States of America"
+  },
+  "gonkong": {
+    "activateId": "14",
+    "label": "Hong Kong"
+  },
+  "tailand": {
+    "activateId": "52",
+    "label": "Thailand"
+  },
+  "meksika": {
+    "activateId": "54",
+    "label": "Mexico"
+  },
+  "latviia": {
+    "activateId": "49",
+    "label": "Latvia"
+  },
+  "pakistan": {
+    "activateId": "66",
+    "label": "Pakistan"
+  },
+  "gretsiia": {
+    "activateId": "129",
+    "label": "Greece"
+  },
+  "nikaragua": {
+    "activateId": "90",
+    "label": "Nicaragua"
+  },
+  "argentina": {
+    "activateId": "39",
+    "label": "Argentina"
+  },
+  "gaiti": {
+    "activateId": "26",
+    "label": "Haiti"
+  },
+  "mongoliia": {
+    "activateId": "72",
+    "label": "Mongolia"
+  },
+  "izrail": {
+    "activateId": "13",
+    "label": "Israel"
+  },
+  "egipet": {
+    "activateId": "21",
+    "label": "Egypt"
+  },
+  "gvatemala": {
+    "activateId": "94",
+    "label": "Guatemala"
+  },
+  "liviia": {
+    "activateId": "102",
+    "label": "Libya"
+  },
+  "iran": {
+    "activateId": "57",
+    "label": "Islamic Republic of Iran"
+  },
+  "iemen": {
+    "activateId": "30",
+    "label": "Yemen"
+  },
+  "tadzhikistan": {
+    "activateId": "143",
+    "label": "Tajikistan"
+  },
+  "kitai": {
+    "activateId": "3",
+    "label": "China"
+  },
+  "shrilanka": {
+    "activateId": "64",
+    "label": "Sri Lanka"
+  },
+  "siriia": {
+    "activateId": "110",
+    "label": "Syria"
+  },
+  "livan": {
+    "activateId": "153",
+    "label": "Lebanon"
+  },
+  "boliviia": {
+    "activateId": "92",
+    "label": "Bolivia"
+  },
+  "serbiia": {
+    "activateId": "29",
+    "label": "Serbia"
+  },
+  "kolumbiia": {
+    "activateId": "33",
+    "label": "Colombia"
+  },
+  "avstriia": {
+    "activateId": "50",
+    "label": "Austria"
+  },
+  "alzhir": {
+    "activateId": "58",
+    "label": "Algeria"
+  },
+  "peru": {
+    "activateId": "65",
+    "label": "Peru"
+  },
+  "gonduras": {
+    "activateId": "88",
+    "label": "Honduras"
+  },
+  "marokko": {
+    "activateId": "37",
+    "label": "Morocco"
+  },
+  "venesuela": {
+    "activateId": "70",
+    "label": "Venezuela"
+  },
+  "nigeriia": {
+    "activateId": "19",
+    "label": "Nigeria"
+  },
+  "iamaika": {
+    "activateId": "103",
+    "label": "Jamaica"
+  },
+  "salvador": {
+    "activateId": "101",
+    "label": "El Salvador"
+  },
+  "botsvana": {
+    "activateId": "123",
+    "label": "Botswana"
+  },
+  "paragvai": {
+    "activateId": "87",
+    "label": "Paraguay"
+  },
+  "nepal": {
+    "activateId": "81",
+    "label": "Nepal"
+  },
+  "uganda": {
+    "activateId": "75",
+    "label": "Uganda"
+  },
+  "irak": {
+    "activateId": "47",
+    "label": "Iraq"
+  },
+  "iordaniia": {
+    "activateId": "116",
+    "label": "Jordan"
+  },
+  "mianma": {
+    "activateId": "5",
+    "label": "Myanmar"
+  },
+  "ukr": {
+    "activateId": "1",
+    "label": "Ukraine"
+  },
+  "demkongo": {
+    "activateId": "18",
+    "label": "Democratic Republic of the Congo"
+  },
+  "keniia": {
+    "activateId": "8",
+    "label": "Kenya"
+  },
+  "kambodzha": {
+    "activateId": "24",
+    "label": "Cambodia"
+  },
+  "belarus": {
+    "activateId": "51",
+    "label": "Belarus"
+  },
+  "kotdivuar": {
+    "activateId": "27",
+    "label": "Ivory Coast"
+  },
+  "saudaraviia": {
+    "activateId": "53",
+    "label": "Saudi Arabia"
+  },
+  "oae": {
+    "activateId": "95",
+    "label": "United Arab Emirates"
+  },
+  "khorvatiia": {
+    "activateId": "45",
+    "label": "Croatia"
+  },
+  "papuanovaiagvineia": {
+    "activateId": "79",
+    "label": "Papua New Guinea"
+  },
+  "tanzaniia": {
+    "activateId": "9",
+    "label": "United Republic of Tanzania"
+  },
+  "gvineia": {
+    "activateId": "68",
+    "label": "Guinea"
+  },
+  "mali": {
+    "activateId": "69",
+    "label": "Mali"
+  },
+  "kamerun": {
+    "activateId": "41",
+    "label": "Cameroon"
+  },
+  "mavritaniia": {
+    "activateId": "114",
+    "label": "Mauritania"
+  },
+  "serraleone": {
+    "activateId": "115",
+    "label": "Sierra Leone"
+  },
+  "burkinafaso": {
+    "activateId": "152",
+    "label": "Burkina Faso"
+  },
+  "daniia": {
+    "activateId": "172",
+    "label": "Denmark"
+  },
+  "tunis": {
+    "activateId": "89",
+    "label": "Tunisia"
+  },
+  "dominikanskaiarespublika": {
+    "activateId": "109",
+    "label": "Dominican Republic"
+  },
+  "iuzhnaiaafrika": {
+    "activateId": "31",
+    "label": "South Africa"
+  },
+  "ekvador": {
+    "activateId": "105",
+    "label": "Ecuador"
+  },
+  "liberiia": {
+    "activateId": "135",
+    "label": "Liberia"
+  },
+  "senegal": {
+    "activateId": "61",
+    "label": "Senegal"
+  },
+  "afganistan": {
+    "activateId": "74",
+    "label": "Afghanistan"
+  },
+  "novaiazelandiia": {
+    "activateId": "67",
+    "label": "New Zealand"
+  },
+  "chad": {
+    "activateId": "42",
+    "label": "Chad"
+  },
+  "angola": {
+    "activateId": "76",
+    "label": "Angola"
+  },
+  "gana": {
+    "activateId": "38",
+    "label": "Ghana"
+  },
+  "iuzhnaiakoreia": {
+    "activateId": "190",
+    "label": "South Korea"
+  },
+  "sudan": {
+    "activateId": "98",
+    "label": "Sudan"
+  },
+  "taivan": {
+    "activateId": "55",
+    "label": "Taiwan, Province of China"
+  },
+  "zimbabve": {
+    "activateId": "96",
+    "label": "Zimbabwe"
+  },
+  "turkmenistan": {
+    "activateId": "161",
+    "label": "Turkmenistan"
+  },
+  "reiunon": {
+    "activateId": "146",
+    "label": "Reunion"
+  },
+  "kipr": {
+    "activateId": "77",
+    "label": "Cyprus"
+  },
+  "gaiana": {
+    "activateId": "131",
+    "label": "Guyana"
+  },
+  "maldivy": {
+    "activateId": "159",
+    "label": "Maldives"
+  },
+  "mozambik": {
+    "activateId": "80",
+    "label": "Mozambique"
+  },
+  "gambiia": {
+    "activateId": "28",
+    "label": "Republic of The Gambia"
+  },
+  "trinidaditobago": {
+    "activateId": "104",
+    "label": "Trinidad and Tobago"
+  },
+  "gabon": {
+    "activateId": "154",
+    "label": "Gabon"
+  },
+  "brunei": {
+    "activateId": "121",
+    "label": "Brunei Darussalam"
+  },
+  "butan": {
+    "activateId": "158",
+    "label": "Bhutan"
+  },
+  "surinam": {
+    "activateId": "142",
+    "label": "Suriname"
+  },
+  "armeniia": {
+    "activateId": "148",
+    "label": "Armenia"
+  },
+  "benin": {
+    "activateId": "120",
+    "label": "Benin"
+  },
+  "mavrikii": {
+    "activateId": "157",
+    "label": "Mauritius"
+  },
+  "fidzhi": {
+    "activateId": "189",
+    "label": "Fiji"
+  },
+  "kongo": {
+    "activateId": "150",
+    "label": "Congo"
+  },
+  "dominika": {
+    "activateId": "126",
+    "label": "Dominica"
+  },
+  "bermudy": {
+    "activateId": "195",
+    "label": "Bermuda"
+  },
+  "aruba": {
+    "activateId": "179",
+    "label": "Aruba"
+  },
+  "chili": {
+    "activateId": "151",
+    "label": "Chile"
+  },
+  "finliandiia": {
+    "activateId": "163",
+    "label": "Finland"
+  },
+  "italiia": {
+    "activateId": "86",
+    "label": "Italy"
+  },
+  "bolgariia": {
+    "activateId": "83",
+    "label": "Bulgaria"
+  },
+  "vengriia": {
+    "activateId": "84",
+    "label": "Hungary"
+  },
+  "sloveniia": {
+    "activateId": "59",
+    "label": "Slovenia"
+  },
+  "norvegiia": {
+    "activateId": "174",
+    "label": "Norway"
+  }
+}

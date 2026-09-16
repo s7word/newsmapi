@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+coverage/
+*.log
+data/*.sqlite*
+data/*.db*
+data/openai-country-sync-state.json
+data/chrome-home/
+.wrangler/

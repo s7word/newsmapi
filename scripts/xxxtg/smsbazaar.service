@@ -1,0 +1,24 @@
+[Unit]
+Description=SMSBazaar API (Telegram alerts + price board)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/smsall
+Environment=NODE_ENV=production
+Environment=HOST=0.0.0.0
+EnvironmentFile=-/opt/smsall/.env
+ExecStart=/usr/bin/node /opt/smsall/src/server.js
+Restart=always
+RestartSec=5
+# SQLite + long OpenAI refresh cycles can be memory-heavy
+LimitNOFILE=65535
+
+# Hardening (safe defaults; adjust if you run as non-root)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

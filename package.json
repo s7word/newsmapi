@@ -1,0 +1,38 @@
+{
+  "name": "smsbazaar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-service multi-provider SMS price and stock comparison dashboard",
+  "homepage": "https://sms.fur.li/",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "node src/server.js",
+    "dev:client": "vite --config vite.config.js",
+    "build": "vite build --config vite.config.js",
+    "start": "node src/server.js",
+    "dev:worker": "npm run build && wrangler dev",
+    "deploy:worker": "npm run build && wrangler deploy",
+    "sync:countries": "node src/scripts/sync-openai-countries.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "i18n-iso-countries": "^7.13.0",
+    "puppeteer-core": "24.43.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "concurrently": "^9.1.2",
+    "jsdom": "^25.0.1",
+    "supertest": "^7.1.1",
+    "vite": "^6.3.5",
+    "vitest": "^2.1.9",
+    "wrangler": "^4.20.0"
+  }
+}
